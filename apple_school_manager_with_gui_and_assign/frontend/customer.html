@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Kundportal – Apple School Manager</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f6f8fa; margin: 0; }
+    main { max-width: 700px; margin: 2rem auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); padding: 2rem; }
+    h1 { color: #1a73e8; }
+    .api-section { margin-top: 2rem; }
+    pre { background: #f1f3f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
+    .back-link { display: inline-block; margin-bottom: 1rem; color: #1a73e8; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    .endpoint-link { color: #174ea6; text-decoration: underline; }
+    .endpoint-link:hover { color: #1a73e8; }
+    .error { color: #e53935; margin-top: 1rem; }
+    .swagger-link { margin-left: 1rem; }
+  </style>
+</head>
+<body>
+  <main>
+    <a href="index.html" class="back-link">&larr; Tillbaka till kundlista</a>
+    <h1 id="customerName">Kund</h1>
+    <div id="customerInfo"></div>
+    <div class="api-section">
+      <h2>API-data</h2>
+      <button id="loadDevicesBtn">Hämta enheter</button>
+      <button id="loadOrgsBtn">Hämta organisationer</button>
+      <span id="swaggerBtn"></span>
+      <div id="apiResult"></div>
+      <div id="apiError" class="error"></div>
+      <div style="margin-top:2rem;">
+        <b>API-endpoints för integration:</b>
+        <ul id="endpointList"></ul>
+      </div>
+    </div>
+  </main>
+  <script>
+    // Hämta customer_id från query
+    const params = new URLSearchParams(window.location.search);
+    const customer_id = params.get('customer_id');
+    if (!customer_id) {
+      document.getElementById('customerName').textContent = "Ingen kund vald";
+      document.getElementById('apiError').textContent = "Ingen customer_id angiven i URL:en.";
+      throw new Error("Ingen customer_id");
+    }
+
+    // Visa länkar till endpoints
+    const endpointList = document.getElementById('endpointList');
+    [
+      { name: "Alla enheter", path: `/api/${customer_id}/devices` },
+      { name: "Organisationer", path: `/api/${customer_id}/orgs` },
+      { name: "Swagger för denna kund", path: `/swagger/${customer_id}` }
+    ].forEach(e => {
+      const li = document.createElement('li');
+      li.innerHTML = `<a href="${e.path}" class="endpoint-link" target="_blank">${e.name}</a>`;
+      endpointList.appendChild(li);
+    });
+
+    // Visa länk till Swagger
+    document.getElementById('swaggerBtn').innerHTML =
+      `<a href="/swagger/${customer_id}" target="_blank" class="swagger-link">Testa i Swagger</a>`;
+
+    // Hämta och visa kundinfo
+    async function loadCustomerInfo() {
+      try {
+        const res = await fetch('/api/customers');
+        const customers = await res.json();
+        const customer = customers.find(c => c.id === customer_id);
+        if (!customer) throw new Error("Kund hittades inte.");
+        document.getElementById('customerName').textContent = customer.name;
+        document.getElementById('customerInfo').innerHTML =
+          `<b>Client ID:</b> ${customer.client_id}<br>
+           <b>Team ID:</b> ${customer.team_id}<br>
+           <b>Key ID:</b> ${customer.key_id}`;
+      } catch (err) {
+        document.getElementById('apiError').textContent = "Kunde inte hämta kundinfo: " + err.message;
+      }
+    }
+
+    // Hämta och visa API-data
+    async function fetchApi(path) {
+      document.getElementById('apiResult').textContent = "";
+      document.getElementById('apiError').textContent = "";
+      try {
+        const res = await fetch(path);
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        document.getElementById('apiResult').innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+      } catch (err) {
+        document.getElementById('apiError').textContent = "Fel vid API-anrop: " + err.message;
+      }
+    }
+
+    document.getElementById('loadDevicesBtn').onclick = () => fetchApi(`/api/${customer_id}/devices`);
+    document.getElementById('loadOrgsBtn').onclick = () => fetchApi(`/api/${customer_id}/orgs`);
+
+    loadCustomerInfo();
+  </script>
+</body>
+</html>

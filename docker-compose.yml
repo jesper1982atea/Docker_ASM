@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  asm-app:
+    build: .
+    container_name: apple_school_manager_v2
+    ports:
+      - "8080:6000"
+    volumes:
+      - ./apple_school_manager_with_gui_and_assign/admin_api/customers:/app/apple_school_manager_with_gui_and_assign/admin_api/customers
+      - ./apple_school_manager_with_gui_and_assign:/app/apple_school_manager_with_gui_and_assign
+    environment:
+      - PYTHONUNBUFFERED=1
+      - FLASK_ENV=development
+      - FLASK_DEBUG=0
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=6000
+      - PYTHONPATH=/app:/app/apple_school_manager_with_gui_and_assign
+      - DEFAULT_ROUTE=frontend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Swagger UI - Kund</title>
+    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css" />
+    <style>
+      body { margin: 0; }
+      #swagger-ui { height: 100vh; }
+      #customer-header { background: #1a73e8; color: #fff; padding: 1rem 2rem; font-size: 1.2rem; }
+    </style>
+  </head>
+  <body>
+    <div id="customer-header"></div>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+    <script>
+      // Hämta customer_id från query-param eller path
+      const urlParams = new URLSearchParams(window.location.search);
+      let customerId = urlParams.get('customer_id');
+      if (!customerId) {
+        const match = window.location.pathname.match(/swagger\/([^\/]+)/);
+        if (match) customerId = match[1];
+      }
+      document.getElementById('customer-header').textContent = customerId
+        ? "Swagger för kund: " + customerId
+        : "Ingen kund vald";
+
+      // Ladda unik swagger-spec för kunden (customer_id är hårdkodad i paths)
+      const specUrl = `/swagger-spec/${customerId}.json`;
+
+      window.addEventListener('DOMContentLoaded', function() {
+        SwaggerUIBundle({
+          url: specUrl,
+          dom_id: '#swagger-ui',
+          presets: [SwaggerUIBundle.presets.apis],
+          layout: "BaseLayout"
+        });
+      });
+    </script>
+  </body>
+</html>
+     
