@@ -228,7 +228,67 @@ class Customers(Resource):
         return {"status": "added", "id": customer_id}, 201
 
 @api.route("/api/customers/<string:customer_id>")
-class CustomerDelete(Resource):
+class CustomerEdit(Resource):
+    def get(self, customer_id):
+        customer_path = os.path.join(CUSTOMERS_DIR, customer_id)
+        meta_path = os.path.join(customer_path, "meta.json")
+        
+        if not os.path.exists(meta_path):
+            return {"error": "Customer not found"}, 404
+            
+        try:
+            with open(meta_path) as f:
+                data = json.load(f)
+                data["id"] = customer_id
+                return data
+        except Exception as e:
+            return {"error": str(e)}, 500
+    
+    def put(self, customer_id):
+        customer_path = os.path.join(CUSTOMERS_DIR, customer_id)
+        meta_path = os.path.join(customer_path, "meta.json")
+        
+        if not os.path.exists(meta_path):
+            return {"error": "Customer not found"}, 404
+            
+        try:
+            # Läs befintlig data
+            with open(meta_path) as f:
+                existing_data = json.load(f)
+            
+            # Uppdatera med nya värden
+            name = request.form.get("name")
+            client_id = request.form.get("client_id")
+            team_id = request.form.get("team_id")
+            key_id = request.form.get("key_id")
+            manager_type = request.form.get("manager_type")
+            pem_file = request.files.get("pem")
+            
+            if name:
+                existing_data["name"] = name
+            if client_id:
+                existing_data["client_id"] = client_id
+            if team_id:
+                existing_data["team_id"] = team_id
+            if key_id:
+                existing_data["key_id"] = key_id
+            if manager_type and manager_type in ["school", "business"]:
+                existing_data["manager_type"] = manager_type
+            
+            # Uppdatera PEM-fil om en ny laddas upp
+            if pem_file:
+                pem_path = os.path.join(customer_path, "private.pem")
+                pem_file.save(pem_path)
+            
+            # Spara uppdaterad data
+            with open(meta_path, "w") as f:
+                json.dump(existing_data, f)
+            
+            return {"status": "updated", "id": customer_id}
+            
+        except Exception as e:
+            return {"error": str(e)}, 500
+
     def delete(self, customer_id):
         customer_path = os.path.join(CUSTOMERS_DIR, customer_id)
         if os.path.exists(customer_path):

@@ -1,102 +1,156 @@
-const root = document.getElementById("root");
+document.addEventListener('DOMContentLoaded', function() {
+    const root = document.getElementById('root');
+    
+    // Create the form HTML
+    root.innerHTML = `
+        <section>
+            <form id="customerForm">
+                <h2 id="formTitle">Lägg till ny kund</h2>
+                <input type="hidden" id="editingCustomerId" />
+                <input name="name" placeholder="Kundnamn" required />
+                <select name="manager_type" required>
+                    <option value="">Välj typ av manager</option>
+                    <option value="school">Apple School Manager</option>
+                    <option value="business">Apple Business Manager</option>
+                </select>
+                <input name="client_id" placeholder="Client ID" required />
+                <input name="team_id" placeholder="Team ID" required />
+                <input name="key_id" placeholder="Key ID" required />
+                <input type="file" name="pem" accept=".pem" id="pemFile" />
+                <small id="pemNote" style="flex-basis: 100%; color: #666;">PEM-fil krävs för nya kunder</small>
+                <button type="submit" id="submitBtn">Lägg till kund</button>
+                <button type="button" id="cancelBtn" style="display: none; background: #666;" onclick="cancelEdit()">Avbryt</button>
+            </form>
+        </section>
+        <section>
+            <h2>Befintliga kunder</h2>
+            <ul id="customerList"></ul>
+        </section>
+    `;
 
-const form = document.createElement("form");
-form.id = "addCustomerForm";
-form.innerHTML = `
-  <h2>Lägg till ny kund</h2>
-  <input name="name" placeholder="Kundnamn" required />
-  <select name="manager_type" required>
-    <option value="">Välj typ av manager</option>
-    <option value="school">Apple School Manager</option>
-    <option value="business">Apple Business Manager</option>
-  </select>
-  <input name="client_id" placeholder="Client ID" required />
-  <input name="team_id" placeholder="Team ID" required />
-  <input name="key_id" placeholder="Key ID" required />
-  <input type="file" name="pem" accept=".pem" required />
-  <button>Lägg till kund</button>
-`;
+    const form = document.getElementById('customerForm');
+    const customerList = document.getElementById('customerList');
 
-form.onsubmit = async (e) => {
-  e.preventDefault();
-  const data = new FormData(form);
-  try {
-    const res = await fetch("/api/customers", {
-      method: "POST",
-      body: data
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(form);
+        const editingId = document.getElementById('editingCustomerId').value;
+        
+        try {
+            let url = '/api/customers';
+            let method = 'POST';
+            
+            if (editingId) {
+                url = `/api/customers/${editingId}`;
+                method = 'PUT';
+            }
+            
+            const response = await fetch(url, {
+                method: method,
+                body: formData
+            });
+            
+            if (response.ok) {
+                form.reset();
+                cancelEdit();
+                loadCustomers();
+                alert(editingId ? 'Kund uppdaterad!' : 'Kund tillagd!');
+            } else {
+                const error = await response.json();
+                alert('Fel: ' + (error.error || 'Okänt fel'));
+            }
+        } catch (error) {
+            alert('Fel vid ' + (editingId ? 'uppdatering' : 'uppladdning') + ': ' + error.message);
+        }
     });
-    if (!res.ok) {
-      const err = await res.json();
-      alert("Fel vid tillägg: " + (err.error || res.statusText));
-      return;
+
+    async function loadCustomers() {
+        try {
+            const response = await fetch('/api/customers');
+            const customers = await response.json();
+            
+            customerList.innerHTML = customers.map(customer => `
+                <li>
+                    <div>
+                        <b>${customer.name}</b> 
+                        <span style="color: #666;">(${customer.manager_type === 'business' ? 'Apple Business Manager' : 'Apple School Manager'})</span>
+                        <br>
+                        <small>ID: ${customer.id}</small>
+                    </div>
+                    <div class="customer-actions">
+                        <button class="edit-btn" onclick="editCustomer('${customer.id}')">
+                            Redigera
+                        </button>
+                        <a href="/swagger/${customer.id}" class="swagger-link" target="_blank">
+                            Swagger UI
+                        </a>
+                        <button class="delete-btn" onclick="deleteCustomer('${customer.id}')">
+                            Ta bort
+                        </button>
+                    </div>
+                </li>
+            `).join('');
+        } catch (error) {
+            console.error('Fel vid laddning av kunder:', error);
+        }
     }
-    alert("Kund tillagd!");
-    form.reset();
-    await loadCustomers();
-  } catch (err) {
-    alert("Kunde inte lägga till kund: " + err.message);
-  }
-};
 
-const listSection = document.createElement("section");
-listSection.innerHTML = `
-  <h2>Befintliga kunder</h2>
-  <ul id="customerList"></ul>
-  <div id="customerError" style="color:#e53935;margin-top:1rem;"></div>
-`;
+    window.editCustomer = async function(customerId) {
+        try {
+            const response = await fetch(`/api/customers/${customerId}`);
+            const customer = await response.json();
+            
+            // Fyll i formuläret med befintlig data
+            document.getElementById('editingCustomerId').value = customerId;
+            document.querySelector('input[name="name"]').value = customer.name;
+            document.querySelector('select[name="manager_type"]').value = customer.manager_type;
+            document.querySelector('input[name="client_id"]').value = customer.client_id;
+            document.querySelector('input[name="team_id"]').value = customer.team_id;
+            document.querySelector('input[name="key_id"]').value = customer.key_id;
+            
+            // Uppdatera UI för redigeringsläge
+            document.getElementById('formTitle').textContent = 'Redigera kund';
+            document.getElementById('submitBtn').textContent = 'Uppdatera kund';
+            document.getElementById('cancelBtn').style.display = 'inline-block';
+            document.getElementById('pemFile').required = false;
+            document.getElementById('pemNote').textContent = 'PEM-fil är valfri vid redigering (lämna tom för att behålla befintlig)';
+            
+            // Scrolla till formuläret
+            document.getElementById('customerForm').scrollIntoView({ behavior: 'smooth' });
+        } catch (error) {
+            alert('Fel vid laddning av kunddata: ' + error.message);
+        }
+    };
 
-async function loadCustomers() {
-  const ul = listSection.querySelector("#customerList");
-  const errorDiv = listSection.querySelector("#customerError");
-  ul.innerHTML = "";
-  errorDiv.textContent = "";
-  try {
-    const res = await fetch("/api/customers");
-    if (!res.ok) throw new Error("Kunde inte hämta kunder");
-    const customers = await res.json();
-    if (!Array.isArray(customers) || customers.length === 0) {
-      ul.innerHTML = `<li style="color:#888;">Inga kunder hittades. Lägg till en kund för att börja.</li>`;
-      return;
-    }
-    customers.forEach(c => {
-      const li = document.createElement("li");
-      li.innerHTML = `
-        <div>
-          <b>${c.name}</b> 
-          <span style="color: #666;">(${c.manager_type === 'business' ? 'Apple Business Manager' : 'Apple School Manager'})</span>
-          <br>
-          <small>ID: ${c.id}</small>
-        </div>
-        <div class="customer-actions">
-          <a href="/swagger/${c.id}" class="swagger-link" target="_blank">
-            Swagger UI
-          </a>
-          <button class="delete-btn" onclick="deleteCustomer('${c.id}')">
-            Ta bort
-          </button>
-        </div>
-      `;
-      li.querySelector(".delete-btn").onclick = async () => {
-        if (!confirm(`Radera kund "${c.name}"?`)) return;
-        await fetch("/api/customers/" + c.id, { method: "DELETE" });
-        await loadCustomers();
-      };
-      ul.appendChild(li);
-    });
-  } catch (err) {
-    errorDiv.textContent = "Fel vid hämtning av kunder: " + err.message;
-  }
-}
+    window.cancelEdit = function() {
+        document.getElementById('editingCustomerId').value = '';
+        document.getElementById('formTitle').textContent = 'Lägg till ny kund';
+        document.getElementById('submitBtn').textContent = 'Lägg till kund';
+        document.getElementById('cancelBtn').style.display = 'none';
+        document.getElementById('pemFile').required = true;
+        document.getElementById('pemNote').textContent = 'PEM-fil krävs för nya kunder';
+        form.reset();
+    };
 
-root.appendChild(form);
-root.appendChild(listSection);
+    window.deleteCustomer = async function(customerId) {
+        if (confirm('Är du säker på att du vill ta bort denna kund?')) {
+            try {
+                const response = await fetch(`/api/customers/${customerId}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadCustomers();
+                    alert('Kund borttagen!');
+                } else {
+                    alert('Fel vid borttagning');
+                }
+            } catch (error) {
+                alert('Fel vid borttagning: ' + error.message);
+            }
+        }
+    };
 
-document.getElementById("swagger-link").innerHTML = `
-  <p>
-    <b>Testa integrationen i Swagger:</b><br>
-    Klicka på "Testa i Swagger" för önskad kund. Ange kundens ID (<code>customer_id</code>) i path-parametrarna i Swagger UI för att testa API:et mot rätt kund.<br>
-    <span style="color:#888;">Swagger UI öppnas i en ny flik.</span>
-  </p>
-`;
-
-loadCustomers();
+    // Load customers on page load
+    loadCustomers();
+});
