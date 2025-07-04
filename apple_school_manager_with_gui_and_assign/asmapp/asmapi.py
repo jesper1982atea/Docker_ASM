@@ -129,3 +129,22 @@ class AppleSchoolManagerAPI:
         devices = all_devices.get("data", all_devices)
         reseller = [d for d in devices if d.get("attributes", {}).get("purchaseSourceType") == "RESELLER"]
         return {"data": reseller}
+
+    def create_org_device_activity(self, payload):
+        """Create an orgDeviceActivity (e.g., ASSIGN_DEVICES)"""
+        response = requests.post(
+            f"{self.api_url}/orgDeviceActivities",
+            headers={**self._auth_headers(), "Content-Type": "application/json"},
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_org_device_activity(self, activity_id):
+        """Get a specific orgDeviceActivity by ID"""
+        response = requests.get(
+            f"{self.api_url}/orgDeviceActivities/{activity_id}",
+            headers=self._auth_headers()
+        )
+        response.raise_for_status()
+        return response.json()
