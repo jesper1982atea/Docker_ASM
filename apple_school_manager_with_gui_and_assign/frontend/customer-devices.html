@@ -47,6 +47,37 @@
         .loading { text-align: center; padding: 3rem; }
         .spinner { border: 4px solid #f3f4f6; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Modal styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal { background: white; border-radius: 12px; max-width: 800px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal-header { padding: 2rem 2rem 1rem; border-bottom: 1px solid #e5e7eb; }
+        .modal-title { font-size: 1.5rem; font-weight: 600; color: #1f2937; }
+        .modal-body { padding: 2rem; }
+        .modal-footer { padding: 1rem 2rem 2rem; display: flex; gap: 1rem; justify-content: flex-end; }
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .detail-item { background: #f9fafb; padding: 1rem; border-radius: 8px; }
+        .detail-label { font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem; }
+        .detail-value { font-weight: 500; color: #1f2937; }
+        
+        /* Advanced filters */
+        .advanced-filters { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+        .filter-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+        .btn-filter { background: #f3f4f6; color: #374151; border: 1px solid #d1d5db; }
+        .btn-filter.active { background: #667eea; color: white; border-color: #667eea; }
+        
+        /* Management actions */
+        .management-section { background: #f9fafb; padding: 1.5rem; border-radius: 8px; margin-top: 1rem; }
+        .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+        .action-item { background: white; padding: 1rem; border-radius: 6px; border: 1px solid #e5e7eb; }
+        .action-title { font-weight: 500; margin-bottom: 0.5rem; }
+        .action-desc { font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem; }
+        
+        /* Status indicators */
+        .status-indicator { display: inline-flex; align-items: center; gap: 0.5rem; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; }
+        .status-dot.assigned { background: #10b981; }
+        .status-dot.unassigned { background: #f59e0b; }
     </style>
 </head>
 <body>
@@ -60,10 +91,18 @@
             const [filteredDevices, setFilteredDevices] = useState([]);
             const [loading, setLoading] = useState(true);
             const [customerInfo, setCustomerInfo] = useState(null);
+            const [selectedDevice, setSelectedDevice] = useState(null);
+            const [showModal, setShowModal] = useState(false);
+            const [mdmServers, setMdmServers] = useState([]);
             const [filters, setFilters] = useState({
                 status: 'all',
                 model: 'all',
-                search: ''
+                search: '',
+                purchaseSource: 'all',
+                color: 'all'
+            });
+            const [advancedFilters, setAdvancedFilters] = useState({
+                showAdvanced: false
             });
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
@@ -72,6 +111,7 @@
                 if (customerId) {
                     fetchDevices();
                     fetchCustomerInfo();
+                    fetchMdmServers();
                 }
             }, [customerId]);
 
@@ -102,6 +142,16 @@
                 }
             };
 
+            const fetchMdmServers = async () => {
+                try {
+                    const response = await fetch(`/api/${customerId}/mdmServers`);
+                    const data = await response.json();
+                    setMdmServers(data.data || []);
+                } catch (error) {
+                    console.error('Error fetching MDM servers:', error);
+                }
+            };
+
             const applyFilters = () => {
                 let filtered = devices;
 
@@ -117,10 +167,23 @@
                     );
                 }
 
+                if (filters.purchaseSource !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.purchaseSourceType === filters.purchaseSource
+                    );
+                }
+
+                if (filters.color !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.color?.toLowerCase() === filters.color.toLowerCase()
+                    );
+                }
+
                 if (filters.search) {
                     filtered = filtered.filter(device => 
                         device.attributes?.serialNumber?.toLowerCase().includes(filters.search.toLowerCase()) ||
-                        device.attributes?.model?.toLowerCase().includes(filters.search.toLowerCase())
+                        device.attributes?.model?.toLowerCase().includes(filters.search.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(filters.search.toLowerCase())
                     );
                 }
 
@@ -136,14 +199,15 @@
                 return { assigned, unassigned, manual, reseller, total: devices.length };
             };
 
-            const getUniqueModels = () => {
-                const models = new Set();
+            const getUniqueValues = (field) => {
+                const values = new Set();
                 devices.forEach(device => {
-                    if (device.attributes?.model) {
-                        models.add(device.attributes.model);
+                    const value = device.attributes?.[field];
+                    if (value) {
+                        values.add(value);
                     }
                 });
-                return Array.from(models).sort();
+                return Array.from(values).sort();
             };
 
             const handleFilterChange = (filterType, value) => {
@@ -157,10 +221,84 @@
                 try {
                     const response = await fetch(`/api/${customerId}/devices/${deviceId}`);
                     const device = await response.json();
-                    alert(`Device Details:\n${JSON.stringify(device, null, 2)}`);
+                    setSelectedDevice(device);
+                    setShowModal(true);
                 } catch (error) {
                     alert('Error fetching device details');
                 }
+            };
+
+            const assignDeviceToMDM = async (deviceId, mdmServerId) => {
+                try {
+                    const payload = {
+                        data: {
+                            type: "orgDeviceActivities",
+                            attributes: {
+                                activityType: "ASSIGN_DEVICES"
+                            },
+                            relationships: {
+                                mdmServer: {
+                                    data: {
+                                        type: "mdmServers",
+                                        id: mdmServerId
+                                    }
+                                },
+                                devices: {
+                                    data: [{
+                                        type: "orgDevices",
+                                        id: deviceId
+                                    }]
+                                }
+                            }
+                        }
+                    };
+
+                    const response = await fetch(`/api/${customerId}/orgDeviceActivities`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        alert('Device assigned successfully!');
+                        fetchDevices(); // Refresh device list
+                        setShowModal(false);
+                    } else {
+                        alert('Error assigning device');
+                    }
+                } catch (error) {
+                    alert('Error assigning device: ' + error.message);
+                }
+            };
+
+            const quickFilter = (filterType) => {
+                const newFilters = { ...filters };
+                
+                switch(filterType) {
+                    case 'unassigned':
+                        newFilters.status = 'unassigned';
+                        break;
+                    case 'assigned':
+                        newFilters.status = 'assigned';
+                        break;
+                    case 'manual':
+                        newFilters.purchaseSource = 'MANUALLY_ADDED';
+                        break;
+                    case 'reseller':
+                        newFilters.purchaseSource = 'RESELLER';
+                        break;
+                    case 'reset':
+                        newFilters.status = 'all';
+                        newFilters.model = 'all';
+                        newFilters.purchaseSource = 'all';
+                        newFilters.color = 'all';
+                        newFilters.search = '';
+                        break;
+                }
+                
+                setFilters(newFilters);
             };
 
             if (!customerId) {
@@ -186,7 +324,8 @@
             }
 
             const stats = getStats();
-            const uniqueModels = getUniqueModels();
+            const uniqueModels = getUniqueValues('model');
+            const uniqueColors = getUniqueValues('color');
 
             return (
                 <div className="container">
@@ -199,26 +338,47 @@
                     </div>
 
                     <div className="stats-grid">
-                        <div className="stat-card assigned">
+                        <div className="stat-card assigned" onClick={() => quickFilter('assigned')} style={{cursor: 'pointer'}}>
                             <div className="stat-number" style={{color: '#10b981'}}>{stats.assigned}</div>
                             <div className="stat-label">Assigned Devices</div>
                         </div>
-                        <div className="stat-card unassigned">
+                        <div className="stat-card unassigned" onClick={() => quickFilter('unassigned')} style={{cursor: 'pointer'}}>
                             <div className="stat-number" style={{color: '#f59e0b'}}>{stats.unassigned}</div>
                             <div className="stat-label">Unassigned Devices</div>
                         </div>
-                        <div className="stat-card manual">
+                        <div className="stat-card manual" onClick={() => quickFilter('manual')} style={{cursor: 'pointer'}}>
                             <div className="stat-number" style={{color: '#8b5cf6'}}>{stats.manual}</div>
                             <div className="stat-label">Manually Added</div>
                         </div>
-                        <div className="stat-card reseller">
+                        <div className="stat-card reseller" onClick={() => quickFilter('reseller')} style={{cursor: 'pointer'}}>
                             <div className="stat-number" style={{color: '#ef4444'}}>{stats.reseller}</div>
                             <div className="stat-label">From Reseller</div>
                         </div>
                     </div>
 
                     <div className="filters">
+                        <div className="filter-row">
+                            <button className="btn btn-filter" onClick={() => quickFilter('reset')}>Show All</button>
+                            <button className={`btn btn-filter ${filters.status === 'unassigned' ? 'active' : ''}`} 
+                                    onClick={() => quickFilter('unassigned')}>Unassigned Only</button>
+                            <button className={`btn btn-filter ${filters.status === 'assigned' ? 'active' : ''}`} 
+                                    onClick={() => quickFilter('assigned')}>Assigned Only</button>
+                            <button className="btn btn-filter" 
+                                    onClick={() => setAdvancedFilters(prev => ({...prev, showAdvanced: !prev.showAdvanced}))}>
+                                {advancedFilters.showAdvanced ? 'Hide' : 'Show'} Advanced Filters
+                            </button>
+                        </div>
+
                         <div className="filter-grid">
+                            <div className="filter-group">
+                                <label>Search</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="Serial, model, or device ID..."
+                                    value={filters.search}
+                                    onChange={(e) => handleFilterChange('search', e.target.value)}
+                                />
+                            </div>
                             <div className="filter-group">
                                 <label>Status</label>
                                 <select 
@@ -230,28 +390,49 @@
                                     <option value="unassigned">Unassigned</option>
                                 </select>
                             </div>
-                            <div className="filter-group">
-                                <label>Model</label>
-                                <select 
-                                    value={filters.model} 
-                                    onChange={(e) => handleFilterChange('model', e.target.value)}
-                                >
-                                    <option value="all">All Models</option>
-                                    {uniqueModels.map(model => (
-                                        <option key={model} value={model}>{model}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div className="filter-group">
-                                <label>Search</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="Serial number or model..."
-                                    value={filters.search}
-                                    onChange={(e) => handleFilterChange('search', e.target.value)}
-                                />
-                            </div>
                         </div>
+
+                        {advancedFilters.showAdvanced && (
+                            <div className="advanced-filters">
+                                <div className="filter-grid">
+                                    <div className="filter-group">
+                                        <label>Model</label>
+                                        <select 
+                                            value={filters.model} 
+                                            onChange={(e) => handleFilterChange('model', e.target.value)}
+                                        >
+                                            <option value="all">All Models</option>
+                                            {uniqueModels.map(model => (
+                                                <option key={model} value={model}>{model}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="filter-group">
+                                        <label>Purchase Source</label>
+                                        <select 
+                                            value={filters.purchaseSource} 
+                                            onChange={(e) => handleFilterChange('purchaseSource', e.target.value)}
+                                        >
+                                            <option value="all">All Sources</option>
+                                            <option value="MANUALLY_ADDED">Manually Added</option>
+                                            <option value="RESELLER">Reseller</option>
+                                        </select>
+                                    </div>
+                                    <div className="filter-group">
+                                        <label>Color</label>
+                                        <select 
+                                            value={filters.color} 
+                                            onChange={(e) => handleFilterChange('color', e.target.value)}
+                                        >
+                                            <option value="all">All Colors</option>
+                                            {uniqueColors.map(color => (
+                                                <option key={color} value={color}>{color}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     <div className="devices-grid">
@@ -261,8 +442,11 @@
                                     <div className="device-model">
                                         {device.attributes?.model || 'Unknown Model'}
                                     </div>
-                                    <div className={`status-badge status-${device.attributes?.status?.toLowerCase()}`}>
-                                        {device.attributes?.status || 'Unknown'}
+                                    <div className="status-indicator">
+                                        <div className={`status-dot ${device.attributes?.status?.toLowerCase()}`}></div>
+                                        <span className={`status-badge status-${device.attributes?.status?.toLowerCase()}`}>
+                                            {device.attributes?.status || 'Unknown'}
+                                        </span>
                                     </div>
                                 </div>
                                 
@@ -273,7 +457,7 @@
                                     </div>
                                     <div className="info-item">
                                         <div className="info-label">Device ID</div>
-                                        <div className="info-value">{device.id}</div>
+                                        <div className="info-value">{device.id.substring(0, 12)}...</div>
                                     </div>
                                     <div className="info-item">
                                         <div className="info-label">Purchase Source</div>
@@ -292,9 +476,17 @@
                                     >
                                         View Details
                                     </button>
-                                    <button className="btn btn-secondary">
-                                        Manage
-                                    </button>
+                                    {device.attributes?.status === 'UNASSIGNED' && (
+                                        <button 
+                                            className="btn btn-secondary"
+                                            onClick={() => {
+                                                setSelectedDevice(device);
+                                                setShowModal(true);
+                                            }}
+                                        >
+                                            Assign Device
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -303,6 +495,102 @@
                     {filteredDevices.length === 0 && (
                         <div style={{textAlign: 'center', padding: '3rem', color: '#6b7280'}}>
                             <p>No devices found matching your filters.</p>
+                            <button className="btn btn-secondary" onClick={() => quickFilter('reset')} style={{marginTop: '1rem'}}>
+                                Clear All Filters
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Device Details/Management Modal */}
+                    {showModal && selectedDevice && (
+                        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+                            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="modal-header">
+                                    <h2 className="modal-title">
+                                        {selectedDevice.data ? 'Device Details' : 'Device Management'}
+                                    </h2>
+                                </div>
+                                <div className="modal-body">
+                                    {selectedDevice.data ? (
+                                        // Detailed view
+                                        <div className="detail-grid">
+                                            <div className="detail-item">
+                                                <div className="detail-label">Device ID</div>
+                                                <div className="detail-value">{selectedDevice.data.id}</div>
+                                            </div>
+                                            <div className="detail-item">
+                                                <div className="detail-label">Model</div>
+                                                <div className="detail-value">{selectedDevice.data.attributes?.model || 'N/A'}</div>
+                                            </div>
+                                            <div className="detail-item">
+                                                <div className="detail-label">Serial Number</div>
+                                                <div className="detail-value">{selectedDevice.data.attributes?.serialNumber || 'N/A'}</div>
+                                            </div>
+                                            <div className="detail-item">
+                                                <div className="detail-label">Status</div>
+                                                <div className="detail-value">
+                                                    <div className="status-indicator">
+                                                        <div className={`status-dot ${selectedDevice.data.attributes?.status?.toLowerCase()}`}></div>
+                                                        {selectedDevice.data.attributes?.status || 'Unknown'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="detail-item">
+                                                <div className="detail-label">Color</div>
+                                                <div className="detail-value">{selectedDevice.data.attributes?.color || 'N/A'}</div>
+                                            </div>
+                                            <div className="detail-item">
+                                                <div className="detail-label">Purchase Source</div>
+                                                <div className="detail-value">{selectedDevice.data.attributes?.purchaseSourceType || 'N/A'}</div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        // Management view for unassigned devices
+                                        <div>
+                                            <div className="detail-grid">
+                                                <div className="detail-item">
+                                                    <div className="detail-label">Device</div>
+                                                    <div className="detail-value">{selectedDevice.attributes?.model || 'Unknown Model'}</div>
+                                                </div>
+                                                <div className="detail-item">
+                                                    <div className="detail-label">Serial Number</div>
+                                                    <div className="detail-value">{selectedDevice.attributes?.serialNumber || 'N/A'}</div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="management-section">
+                                                <h3>Assign to MDM Server</h3>
+                                                <div className="action-grid">
+                                                    {mdmServers.map(server => (
+                                                        <div key={server.id} className="action-item">
+                                                            <div className="action-title">{server.attributes?.name || server.id}</div>
+                                                            <div className="action-desc">
+                                                                {server.attributes?.organizationName || 'MDM Server'}
+                                                            </div>
+                                                            <button 
+                                                                className="btn btn-primary"
+                                                                onClick={() => assignDeviceToMDM(selectedDevice.id, server.id)}
+                                                            >
+                                                                Assign Here
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {mdmServers.length === 0 && (
+                                                    <p style={{color: '#6b7280', textAlign: 'center'}}>
+                                                        No MDM servers available for assignment.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="modal-footer">
+                                    <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
                 </div>
