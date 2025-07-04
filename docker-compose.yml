@@ -7,8 +7,8 @@ services:
     ports:
       - "8080:6000"
     volumes:
-      - ./customers:/app/apple_school_manager_with_gui_and_assign/admin_api/customers
-      - ./apple_school_manager_with_gui_and_assign:/app/apple_school_manager_with_gui_and_assign
+      - ./customers:/app/admin_api/customers
+      - ./app:/app
     environment:
       - PYTHONUNBUFFERED=1
       - FLASK_ENV=development
