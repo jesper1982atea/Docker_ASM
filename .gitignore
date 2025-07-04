@@ -1,4 +1,5 @@
 # Customer data - contains sensitive PEM files and customer information
+customers/
 app/admin_api/customers/
 
 # Python
