@@ -563,7 +563,7 @@
                                                 <div className="action-grid">
                                                     {mdmServers.map(server => (
                                                         <div key={server.id} className="action-item">
-                                                            <div className="action-title">{server.attributes?.name || server.id}</div>
+                                                            <div className="action-title">{server.attributes?.name || server.id || server.serverName}</div>
                                                             <div className="action-desc">
                                                                 {server.attributes?.organizationName || 'MDM Server'}
                                                             </div>
