@@ -20,7 +20,7 @@ EXPOSE 6000
 
 # Lägg till hälsokontroll
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:6000/api/customers || exit 1
+  CMD curl -f http://localhost:6000/health || exit 1
 
 # Starta appen direkt med app.py för att använda environment variables
 CMD ["python", "app/app.py"]
