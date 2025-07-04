@@ -81,6 +81,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         <button class="edit-btn" onclick="editCustomer('${customer.id}')">
                             Redigera
                         </button>
+                        <a href="/customer/${customer.id}/devices?customer=${customer.id}" class="swagger-link" target="_blank">
+                            View Devices
+                        </a>
                         <a href="/swagger/${customer.id}" class="swagger-link" target="_blank">
                             Swagger UI
                         </a>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Management</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-left: 4px solid; }
+        .stat-card.assigned { border-left-color: #10b981; }
+        .stat-card.unassigned { border-left-color: #f59e0b; }
+        .stat-card.manual { border-left-color: #8b5cf6; }
+        .stat-card.reseller { border-left-color: #ef4444; }
+        .stat-number { font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem; }
+        .stat-label { color: #6b7280; font-size: 0.875rem; }
+        .filters { background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-group label { margin-bottom: 0.5rem; font-weight: 500; color: #374151; }
+        .filter-group select, .filter-group input { padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 0.875rem; }
+        .filter-group select:focus, .filter-group input:focus { outline: none; border-color: #667eea; }
+        .devices-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; }
+        .device-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); transition: transform 0.2s, box-shadow 0.2s; }
+        .device-card:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
+        .device-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .device-model { font-weight: 600; font-size: 1.1rem; color: #1f2937; }
+        .status-badge { padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.75rem; font-weight: 500; text-transform: uppercase; }
+        .status-assigned { background: #d1fae5; color: #065f46; }
+        .status-unassigned { background: #fef3c7; color: #92400e; }
+        .device-info { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem; }
+        .info-item { display: flex; flex-direction: column; }
+        .info-label { font-size: 0.75rem; color: #6b7280; margin-bottom: 0.25rem; }
+        .info-value { font-size: 0.875rem; color: #374151; font-weight: 500; }
+        .device-actions { display: flex; gap: 0.5rem; }
+        .btn { padding: 0.5rem 1rem; border-radius: 6px; border: none; font-size: 0.875rem; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a67d8; }
+        .btn-secondary { background: #e5e7eb; color: #374151; }
+        .btn-secondary:hover { background: #d1d5db; }
+        .loading { text-align: center; padding: 3rem; }
+        .spinner { border: 4px solid #f3f4f6; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function DeviceManagement() {
+            const [devices, setDevices] = useState([]);
+            const [filteredDevices, setFilteredDevices] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [customerInfo, setCustomerInfo] = useState(null);
+            const [filters, setFilters] = useState({
+                status: 'all',
+                model: 'all',
+                search: ''
+            });
+
+            const customerId = new URLSearchParams(window.location.search).get('customer');
+
+            useEffect(() => {
+                if (customerId) {
+                    fetchDevices();
+                    fetchCustomerInfo();
+                }
+            }, [customerId]);
+
+            useEffect(() => {
+                applyFilters();
+            }, [devices, filters]);
+
+            const fetchCustomerInfo = async () => {
+                try {
+                    const response = await fetch(`/api/customers/${customerId}`);
+                    const data = await response.json();
+                    setCustomerInfo(data);
+                } catch (error) {
+                    console.error('Error fetching customer info:', error);
+                }
+            };
+
+            const fetchDevices = async () => {
+                try {
+                    setLoading(true);
+                    const response = await fetch(`/api/${customerId}/devices`);
+                    const data = await response.json();
+                    setDevices(data.data || []);
+                } catch (error) {
+                    console.error('Error fetching devices:', error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const applyFilters = () => {
+                let filtered = devices;
+
+                if (filters.status !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.status?.toLowerCase() === filters.status.toLowerCase()
+                    );
+                }
+
+                if (filters.model !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.model?.includes(filters.model)
+                    );
+                }
+
+                if (filters.search) {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.serialNumber?.toLowerCase().includes(filters.search.toLowerCase()) ||
+                        device.attributes?.model?.toLowerCase().includes(filters.search.toLowerCase())
+                    );
+                }
+
+                setFilteredDevices(filtered);
+            };
+
+            const getStats = () => {
+                const assigned = devices.filter(d => d.attributes?.status === 'ASSIGNED').length;
+                const unassigned = devices.filter(d => d.attributes?.status === 'UNASSIGNED').length;
+                const manual = devices.filter(d => d.attributes?.purchaseSourceType === 'MANUALLY_ADDED').length;
+                const reseller = devices.filter(d => d.attributes?.purchaseSourceType === 'RESELLER').length;
+
+                return { assigned, unassigned, manual, reseller, total: devices.length };
+            };
+
+            const getUniqueModels = () => {
+                const models = new Set();
+                devices.forEach(device => {
+                    if (device.attributes?.model) {
+                        models.add(device.attributes.model);
+                    }
+                });
+                return Array.from(models).sort();
+            };
+
+            const handleFilterChange = (filterType, value) => {
+                setFilters(prev => ({
+                    ...prev,
+                    [filterType]: value
+                }));
+            };
+
+            const viewDeviceDetails = async (deviceId) => {
+                try {
+                    const response = await fetch(`/api/${customerId}/devices/${deviceId}`);
+                    const device = await response.json();
+                    alert(`Device Details:\n${JSON.stringify(device, null, 2)}`);
+                } catch (error) {
+                    alert('Error fetching device details');
+                }
+            };
+
+            if (!customerId) {
+                return (
+                    <div className="container">
+                        <div className="header">
+                            <h1>Error: No customer specified</h1>
+                            <p>Please provide a customer ID in the URL parameters.</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (loading) {
+                return (
+                    <div className="container">
+                        <div className="loading">
+                            <div className="spinner"></div>
+                            <p>Loading devices...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            const stats = getStats();
+            const uniqueModels = getUniqueModels();
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>Device Management</h1>
+                        <p>
+                            {customerInfo ? `${customerInfo.name} - ${customerInfo.manager_type === 'business' ? 'Apple Business Manager' : 'Apple School Manager'}` : 'Loading customer info...'}
+                        </p>
+                        <p>Total Devices: {stats.total}</p>
+                    </div>
+
+                    <div className="stats-grid">
+                        <div className="stat-card assigned">
+                            <div className="stat-number" style={{color: '#10b981'}}>{stats.assigned}</div>
+                            <div className="stat-label">Assigned Devices</div>
+                        </div>
+                        <div className="stat-card unassigned">
+                            <div className="stat-number" style={{color: '#f59e0b'}}>{stats.unassigned}</div>
+                            <div className="stat-label">Unassigned Devices</div>
+                        </div>
+                        <div className="stat-card manual">
+                            <div className="stat-number" style={{color: '#8b5cf6'}}>{stats.manual}</div>
+                            <div className="stat-label">Manually Added</div>
+                        </div>
+                        <div className="stat-card reseller">
+                            <div className="stat-number" style={{color: '#ef4444'}}>{stats.reseller}</div>
+                            <div className="stat-label">From Reseller</div>
+                        </div>
+                    </div>
+
+                    <div className="filters">
+                        <div className="filter-grid">
+                            <div className="filter-group">
+                                <label>Status</label>
+                                <select 
+                                    value={filters.status} 
+                                    onChange={(e) => handleFilterChange('status', e.target.value)}
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="assigned">Assigned</option>
+                                    <option value="unassigned">Unassigned</option>
+                                </select>
+                            </div>
+                            <div className="filter-group">
+                                <label>Model</label>
+                                <select 
+                                    value={filters.model} 
+                                    onChange={(e) => handleFilterChange('model', e.target.value)}
+                                >
+                                    <option value="all">All Models</option>
+                                    {uniqueModels.map(model => (
+                                        <option key={model} value={model}>{model}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="filter-group">
+                                <label>Search</label>
+                                <input 
+                                    type="text" 
+                                    placeholder="Serial number or model..."
+                                    value={filters.search}
+                                    onChange={(e) => handleFilterChange('search', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="devices-grid">
+                        {filteredDevices.map(device => (
+                            <div key={device.id} className="device-card">
+                                <div className="device-header">
+                                    <div className="device-model">
+                                        {device.attributes?.model || 'Unknown Model'}
+                                    </div>
+                                    <div className={`status-badge status-${device.attributes?.status?.toLowerCase()}`}>
+                                        {device.attributes?.status || 'Unknown'}
+                                    </div>
+                                </div>
+                                
+                                <div className="device-info">
+                                    <div className="info-item">
+                                        <div className="info-label">Serial Number</div>
+                                        <div className="info-value">{device.attributes?.serialNumber || 'N/A'}</div>
+                                    </div>
+                                    <div className="info-item">
+                                        <div className="info-label">Device ID</div>
+                                        <div className="info-value">{device.id}</div>
+                                    </div>
+                                    <div className="info-item">
+                                        <div className="info-label">Purchase Source</div>
+                                        <div className="info-value">{device.attributes?.purchaseSourceType || 'N/A'}</div>
+                                    </div>
+                                    <div className="info-item">
+                                        <div className="info-label">Color</div>
+                                        <div className="info-value">{device.attributes?.color || 'N/A'}</div>
+                                    </div>
+                                </div>
+
+                                <div className="device-actions">
+                                    <button 
+                                        className="btn btn-primary"
+                                        onClick={() => viewDeviceDetails(device.id)}
+                                    >
+                                        View Details
+                                    </button>
+                                    <button className="btn btn-secondary">
+                                        Manage
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {filteredDevices.length === 0 && (
+                        <div style={{textAlign: 'center', padding: '3rem', color: '#6b7280'}}>
+                            <p>No devices found matching your filters.</p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<DeviceManagement />, document.getElementById('root'));
+    </script>
+</body>
+</html>

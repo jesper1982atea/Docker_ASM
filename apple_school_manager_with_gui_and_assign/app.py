@@ -387,6 +387,11 @@ def generate_customer_swagger_spec(customer_id):
 def swagger_spec_customer(customer_id):
     return generate_customer_swagger_spec(customer_id)
 
+@app.route("/customer/<customer_id>/devices")
+def customer_devices_page(customer_id):
+    """Serve the customer-specific devices page"""
+    return send_from_directory(FRONTEND_DIR, "customer-devices.html")
+
 if __name__ == "__main__":
     # Use environment variables for Docker compatibility
     host = os.getenv('FLASK_HOST', '0.0.0.0')
