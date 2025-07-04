@@ -1,5 +1,5 @@
 # Customer data - contains sensitive PEM files and customer information
-apple_school_manager_with_gui_and_assign/admin_api/customers/
+app/admin_api/customers/
 
 # Python
 __pycache__/
