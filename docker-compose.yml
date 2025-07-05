@@ -6,7 +6,6 @@ services:
       - "8080:6000"
     volumes:
       - ./customers:/app/admin_api/customers
-      - ./apple_school_manager_with_gui_and_assign:/app
     environment:
       - PYTHONUNBUFFERED=1
       - FLASK_ENV=development
@@ -35,4 +34,5 @@ services:
   #     - WATCHTOWER_LABEL_ENABLE=true
   #   restart: unless-stopped
   #   profiles:
+  #     - production
   #     - production
