@@ -302,11 +302,36 @@
                 try {
                     const response = await fetch(`/api/${customerId}/devices/${deviceId}`);
                     const device = await response.json();
+                    
+                    // If device is assigned, also fetch the assigned server info
+                    if (device.data?.attributes?.status === 'ASSIGNED') {
+                        try {
+                            const serverResponse = await fetch(`/api/${customerId}/devices/${deviceId}/assignedServer`);
+                            const serverData = await serverResponse.json();
+                            device.assignedServer = serverData;
+                        } catch (error) {
+                            console.warn('Could not fetch assigned server info:', error);
+                        }
+                    }
+                    
                     setSelectedDevice(device);
                     setShowModal(true);
                 } catch (error) {
                     alert('Error fetching device details');
                 }
+            };
+
+            const getAssignedServerName = (device) => {
+                // Try to find the server name from relationships first
+                const assignedServerId = device.relationships?.assignedServer?.data?.id;
+                if (assignedServerId) {
+                    const server = mdmServers.find(s => s.id === assignedServerId);
+                    if (server) {
+                        return server.attributes?.serverName || server.attributes?.name || server.id;
+                    }
+                    return assignedServerId.substring(0, 8) + '...';
+                }
+                return 'Unknown Server';
             };
 
             const assignDeviceToMDM = async (deviceId, mdmServerId) => {
@@ -697,8 +722,15 @@
                                         <div className="info-value">{device.attributes?.purchaseSourceType || 'N/A'}</div>
                                     </div>
                                     <div className="info-item">
-                                        <div className="info-label">Color</div>
-                                        <div className="info-value">{device.attributes?.color || 'N/A'}</div>
+                                        <div className="info-label">
+                                            {device.attributes?.status === 'ASSIGNED' ? 'Assigned to' : 'Color'}
+                                        </div>
+                                        <div className="info-value">
+                                            {device.attributes?.status === 'ASSIGNED' 
+                                                ? getAssignedServerName(device)
+                                                : (device.attributes?.color || 'N/A')
+                                            }
+                                        </div>
                                     </div>
                                 </div>
 
@@ -769,13 +801,26 @@
                                                 </div>
                                             </div>
                                             <div className="detail-item">
-                                                <div className="detail-label">Color</div>
-                                                <div className="detail-value">{selectedDevice.data.attributes?.color || 'N/A'}</div>
-                                            </div>
-                                            <div className="detail-item">
                                                 <div className="detail-label">Purchase Source</div>
                                                 <div className="detail-value">{selectedDevice.data.attributes?.purchaseSourceType || 'N/A'}</div>
                                             </div>
+                                            {selectedDevice.data.attributes?.status === 'ASSIGNED' && (
+                                                <div className="detail-item">
+                                                    <div className="detail-label">Assigned MDM Server</div>
+                                                    <div className="detail-value">
+                                                        {selectedDevice.assignedServer?.data?.attributes?.serverName || 
+                                                         selectedDevice.assignedServer?.data?.attributes?.name ||
+                                                         getAssignedServerName(selectedDevice.data) ||
+                                                         'Unknown Server'}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {selectedDevice.data.attributes?.color && (
+                                                <div className="detail-item">
+                                                    <div className="detail-label">Color</div>
+                                                    <div className="detail-value">{selectedDevice.data.attributes.color}</div>
+                                                </div>
+                                            )}
                                         </div>
                                     ) : (
                                         // Management view for unassigned devices
