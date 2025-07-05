@@ -484,13 +484,14 @@
                         body: JSON.stringify({ device_ids: [deviceId] })
                     });
                     if (response.ok) {
-                        alert('Device unassigned!');
+                        alert('Device unassigned successfully!');
                         fetchDevices();
+                        setShowModal(false);
                     } else {
                         alert('Failed to unassign device');
                     }
-                } catch (e) {
-                    alert('Error: ' + e.message);
+                } catch (err) {
+                    alert('Error unassigning device: ' + err);
                 }
             };
 
@@ -554,30 +555,18 @@
                 setSelectedDevices(newSelected);
             };
 
-            const selectAllUnassigned = () => {
-                if (selectedDevices.size === unassignedDevices.length) {
-                    setSelectedDevices(new Set());
-                } else {
-                    setSelectedDevices(new Set(unassignedDevices.map(d => d.id)));
-                }
-            };
-
             const selectAllFilteredUnassigned = () => {
-                if (selectedDevices.size === filteredUnassignedDevices.length && filteredUnassignedDevices.length > 0) {
-                    // Deselect all filtered devices
-                    const newSelected = new Set(selectedDevices);
-                    filteredUnassignedDevices.forEach(device => {
-                        newSelected.delete(device.id);
-                    });
-                    setSelectedDevices(newSelected);
+                const allFilteredSelected = filteredUnassignedDevices.length > 0 && filteredUnassignedDevices.every(d => selectedDevices.has(d.id));
+                const newSelected = new Set(selectedDevices);
+
+                if (allFilteredSelected) {
+                    // Deselect all filtered
+                    filteredUnassignedDevices.forEach(d => newSelected.delete(d.id));
                 } else {
-                    // Select all filtered devices
-                    const newSelected = new Set(selectedDevices);
-                    filteredUnassignedDevices.forEach(device => {
-                        newSelected.add(device.id);
-                    });
-                    setSelectedDevices(newSelected);
+                    // Select all filtered
+                    filteredUnassignedDevices.forEach(d => newSelected.add(d.id));
                 }
+                setSelectedDevices(newSelected);
             };
 
             const assignSelectedDevices = async () => {
@@ -620,8 +609,8 @@
 
                     if (response.ok) {
                         alert(`Successfully assigned ${selectedDevices.size} devices!`);
+                        setShowMdmDetail(false);
                         await fetchDevices(); // Refresh device list
-                        // Don't refresh MDM detail view immediately, let useEffect handle it
                     } else {
                         alert('Error assigning devices');
                     }
@@ -983,10 +972,10 @@
                                                 <h3>Assign to MDM Server</h3>
                                                 <div className="action-grid">
                                                     {mdmServers.map(server => (
-                                                        <div key={server.attributes?.serverName } className="action-item">
+                                                        <div key={server.id} className="action-item">
                                                             <div className="action-title">{server.attributes?.serverName  || server.attributes?.name || server.id}</div>
                                                             <div className="action-desc">
-                                                                {server.attributes?.serverName || server.attributes?.name || 'MDM Server'}
+                                                                {server.attributes?.organizationName || 'MDM Server'}
                                                             </div>
                                                             <button 
                                                                 className="btn btn-primary"
@@ -1163,8 +1152,7 @@
                                                         className="btn btn-secondary"
                                                         onClick={selectAllFilteredUnassigned}
                                                     >
-                                                        {selectedDevices.size > 0 && 
-                                                         filteredUnassignedDevices.every(device => selectedDevices.has(device.id)) 
+                                                        {filteredUnassignedDevices.length > 0 && filteredUnassignedDevices.every(d => selectedDevices.has(d.id))
                                                             ? 'Deselect All Filtered' 
                                                             : 'Select All Filtered'}
                                                     </button>
@@ -1205,4 +1193,229 @@
     </script>
 </body>
 </html>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+            
+                    function DevicesGrid({ devices, onViewDetails, getAssignedServerName }) {
+                        if (devices.length === 0) {
+                            return <p>No devices match the current filters.</p>;
+                        }
+                        return (
+                            <div className="devices-grid">
+                                {devices.map(device => (
+                                    <DeviceCard 
+                                        key={device.id} 
+                                        device={device} 
+                                        onViewDetails={onViewDetails} 
+                                        getAssignedServerName={getAssignedServerName}
+                                    />
+                                ))}
+                            </div>
+                        );
+                    }
+            
+                    function DeviceCard({ device, onViewDetails, getAssignedServerName }) {
+                        const { id, attributes } = device;
+                        const status = attributes?.status || 'UNKNOWN';
+                        const assignedServerName = status === 'ASSIGNED' ? getAssignedServerName(device) : 'N/A';
+            
+                        return (
+                            <div className="device-card">
+                                <div className="device-header">
+                                    <span className="device-model">{attributes?.deviceModel || 'Unknown Model'}</span>
+                                    <span className={`status-badge status-${status.toLowerCase()}`}>{status}</span>
+                                </div>
+                                <div className="device-info">
+                                    <InfoItem label="Serial Number" value={attributes?.serialNumber || 'N/A'} />
+                                    <InfoItem label="Assigned MDM" value={assignedServerName} />
+                                    <InfoItem label="Purchase Source" value={attributes?.purchaseSourceType || 'N/A'} />
+                                    <InfoItem label="Color" value={attributes?.color || 'N/A'} />
+                                </div>
+                                <div className="device-actions">
+                                    <button className="btn btn-primary" onClick={() => onViewDetails(id)}>View Details</button>
+                                </div>
+                            </div>
+                        );
+                    }
+            
+                    function InfoItem({ label, value }) {
+                        return (
+                            <div className="info-item">
+                                <div className="info-label">{label}</div>
+                                <div className="info-value">{value}</div>
+                            </div>
+                        );
+                    }
+            
+                    function DeviceDetailModal({ device, onClose, mdmServers, onAssign, onUnassign }) {
+                        const [selectedMdm, setSelectedMdm] = useState('');
+                        const { data, assignedServer } = device;
+                        const attributes = data?.attributes || {};
+                        const relationships = data?.relationships || {};
+            
+                        const assignedServerInfo = assignedServer?.data?.attributes;
+                        const assignedServerId = assignedServer?.data?.id;
+            
+                        return (
+                            <div className="modal-overlay" onClick={onClose}>
+                                <div className="modal" onClick={e => e.stopPropagation()}>
+                                    <div className="modal-header">
+                                        <h2 className="modal-title">{attributes.deviceModel || 'Device Details'}</h2>
+                                    </div>
+                                    <div className="modal-body">
+                                        <div className="detail-grid">
+                                            <DetailItem label="Serial Number" value={attributes.serialNumber} />
+                                            <DetailItem label="Device ID" value={data.id} />
+                                            <DetailItem label="Status" value={attributes.status} />
+                                            <DetailItem label="Color" value={attributes.color} />
+                                            <DetailItem label="Storage" value={attributes.storage} />
+                                            <DetailItem label="MEID" value={attributes.meid} />
+                                            <DetailItem label="OS" value={attributes.os} />
+                                            <DetailItem label="Device Family" value={attributes.deviceFamily} />
+                                            <DetailItem label="Purchase Source" value={attributes.purchaseSourceType} />
+                                            <DetailItem label="Order Number" value={attributes.orderNumber} />
+                                            <DetailItem label="PO Number" value={attributes.poNumber} />
+                                            <DetailItem label="Acquisition Date" value={new Date(attributes.acquisitionDate).toLocaleDateString()} />
+                                        </div>
+                                        
+                                        <div className="management-section">
+                                            <h3>Management</h3>
+                                            {attributes.status === 'ASSIGNED' ? (
+                                                <div>
+                                                    <p>Currently assigned to:</p>
+                                                    <div className="detail-item">
+                                                        <div className="detail-label">MDM Server</div>
+                                                        <div className="detail-value">{assignedServerInfo?.serverName || assignedServerInfo?.name || assignedServerId || 'Loading...'}</div>
+                                                    </div>
+                                                    <button className="btn btn-secondary" onClick={() => onUnassign(data.id)} style={{marginTop: '1rem'}}>Unassign Device</button>
+                                                </div>
+                                            ) : (
+                                                <div className="action-grid">
+                                                    <div className="action-item">
+                                                        <div className="action-title">Assign to MDM Server</div>
+                                                        <div className="action-desc">Select an MDM server to assign this device to.</div>
+                                                        <select value={selectedMdm} onChange={e => setSelectedMdm(e.target.value)} style={{width: '100%', padding: '0.5rem', marginBottom: '1rem'}}>
+                                                            <option value="">Select a server...</option>
+                                                            {mdmServers.map(server => (
+                                                                <option key={server.id} value={server.id}>
+                                                                    {server.attributes?.serverName || server.attributes?.name || server.id}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                        <button 
+                                                            className="btn btn-primary" 
+                                                            onClick={() => onAssign(data.id, selectedMdm)}
+                                                            disabled={!selectedMdm}
+                                                        >
+                                                            Assign
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button className="btn btn-secondary" onClick={onClose}>Close</button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+            
+                    function DetailItem({ label, value }) {
+                        return (
+                            <div className="detail-item">
+                                <div className="detail-label">{label}</div>
+                                <div className="detail-value">{value || 'N/A'}</div>
+                            </div>
+                        );
+                    }
+            
+                    function MdmServerDetailView({ 
+                        server, onClose, assignedDevices, unassignedDevices, 
+                        selectedDevices, onDeviceSelect, onBulkAssign,
+                        unassignedDeviceSearch, setUnassignedDeviceSearch,
+                        assignedDeviceSearch, setAssignedDeviceSearch
+                    }) {
+                        return (
+                            <div className="mdm-detail-modal">
+                                <div className="mdm-detail-content">
+                                    <div className="mdm-detail-header">
+                                        <h2>{server.attributes?.serverName || server.attributes?.name}</h2>
+                                        <p>ID: {server.id}</p>
+                                    </div>
+                                    <div className="mdm-detail-body">
+                                        <div className="device-sections">
+                                            <div className="device-section">
+                                                <h4>Devices Assigned to this Server ({assignedDevices.length})</h4>
+                                                <div className="device-search">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Search assigned devices..." 
+                                                        value={assignedDeviceSearch}
+                                                        onChange={e => setAssignedDeviceSearch(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="device-list">
+                                                    {assignedDevices.map(device => (
+                                                        <div key={device.id} className="device-item">
+                                                            <div className="device-item-info">
+                                                                <div className="device-item-name">{device.attributes?.deviceModel}</div>
+                                                                <div className="device-item-serial">SN: {device.attributes?.serialNumber}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="device-section">
+                                                <h4>Unassigned Devices ({unassignedDevices.length})</h4>
+                                                <div className="device-search">
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Search unassigned devices..." 
+                                                        value={unassignedDeviceSearch}
+                                                        onChange={e => setUnassignedDeviceSearch(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="device-list">
+                                                    {unassignedDevices.map(device => (
+                                                        <div key={device.id} className={`device-item ${selectedDevices.has(device.id) ? 'selected' : ''}`} onClick={() => onDeviceSelect(device.id)}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="device-checkbox"
+                                                                checked={selectedDevices.has(device.id)}
+                                                                readOnly
+                                                            />
+                                                            <div className="device-item-info">
+                                                                <div className="device-item-name">{device.attributes?.deviceModel}</div>
+                                                                <div className="device-item-serial">SN: {device.attributes?.serialNumber}</div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="bulk-actions">
+                                            <button className="btn assign-btn" onClick={onBulkAssign} disabled={selectedDevices.size === 0}>
+                                                Assign Selected ({selectedDevices.size}) to this Server
+                                            </button>
+                                            <span className="selected-count">{selectedDevices.size} devices selected</span>
+                                        </div>
+                                    </div>
+                                    <div className="modal-footer">
+                                        <button className="btn back-btn" onClick={onClose}>Back to Device List</button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+            
+                    const root = ReactDOM.createRoot(document.getElementById('root'));
+                    root.render(<DeviceManagement />);
+                </script>
+            </body>
+            </html>
 
