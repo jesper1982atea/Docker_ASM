@@ -562,8 +562,8 @@
                                                 <h3>Assign to MDM Server</h3>
                                                 <div className="action-grid">
                                                     {mdmServers.map(server => (
-                                                        <div key={server.id} className="action-item">
-                                                            <div className="action-title">{server.serverName || server.attributes?.name || server.id}</div>
+                                                        <div key={server.attributes?.serverName } className="action-item">
+                                                            <div className="action-title">{server.attributes?.serverName  || server.attributes?.name || server.id}</div>
                                                             <div className="action-desc">
                                                                 {server.attributes?.serverName || server.attributes?.name || 'MDM Server'}
                                                             </div>
