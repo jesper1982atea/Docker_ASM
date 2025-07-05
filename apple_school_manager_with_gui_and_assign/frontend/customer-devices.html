@@ -87,6 +87,34 @@
         .mdm-server-info { font-size: 0.875rem; color: #6b7280; }
         .mdm-toggle { background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.875rem; margin-top: 0.5rem; }
         .mdm-toggle:hover { text-decoration: underline; }
+        
+        /* MDM Server Detail View */
+        .mdm-detail-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .mdm-detail-content { background: white; border-radius: 12px; max-width: 1200px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .mdm-detail-header { padding: 2rem; border-bottom: 1px solid #e5e7eb; background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; }
+        .mdm-detail-body { padding: 2rem; }
+        .device-sections { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem; }
+        .device-section { background: #f9fafb; border-radius: 12px; padding: 1.5rem; }
+        .device-section h4 { margin: 0 0 1rem 0; color: #1f2937; }
+        .device-list { max-height: 400px; overflow-y: auto; }
+        .device-item { background: white; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center; }
+        .device-item:hover { background: #f3f4f6; }
+        .device-item.selected { border-color: #6366f1; background: #ede9fe; }
+        .device-item-info { flex: 1; }
+        .device-item-name { font-weight: 500; margin-bottom: 0.25rem; }
+        .device-item-serial { font-size: 0.875rem; color: #6b7280; }
+        .device-checkbox { margin-right: 1rem; }
+        .bulk-actions { background: white; padding: 1rem; border-radius: 8px; margin-top: 1rem; display: flex; gap: 1rem; align-items: center; }
+        .assign-btn { background: #10b981; color: white; }
+        .assign-btn:hover { background: #059669; }
+        .selected-count { color: #6b7280; margin-left: auto; }
+        .back-btn { background: #6b7280; color: white; }
+        .back-btn:hover { background: #4b5563; }
+        
+        @media (max-width: 900px) {
+            .device-sections { grid-template-columns: 1fr; }
+            .mdm-detail-content { width: 98%; }
+        }
     </style>
 </head>
 <body>
@@ -114,6 +142,11 @@
                 showAdvanced: false
             });
             const [showMdmServers, setShowMdmServers] = useState(false);
+            const [selectedMdmServer, setSelectedMdmServer] = useState(null);
+            const [showMdmDetail, setShowMdmDetail] = useState(false);
+            const [selectedDevices, setSelectedDevices] = useState(new Set());
+            const [assignedToServer, setAssignedToServer] = useState([]);
+            const [unassignedDevices, setUnassignedDevices] = useState([]);
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
 
@@ -311,6 +344,93 @@
                 setFilters(newFilters);
             };
 
+            const showMdmServerDetail = async (server) => {
+                setSelectedMdmServer(server);
+                
+                // Get assigned devices for this server
+                const assigned = devices.filter(device => {
+                    return device.relationships?.assignedServer?.data?.id === server.id;
+                });
+                
+                // Get unassigned devices
+                const unassigned = devices.filter(device => 
+                    device.attributes?.status === 'UNASSIGNED'
+                );
+                
+                setAssignedToServer(assigned);
+                setUnassignedDevices(unassigned);
+                setSelectedDevices(new Set());
+                setShowMdmDetail(true);
+            };
+
+            const toggleDeviceSelection = (deviceId) => {
+                const newSelected = new Set(selectedDevices);
+                if (newSelected.has(deviceId)) {
+                    newSelected.delete(deviceId);
+                } else {
+                    newSelected.add(deviceId);
+                }
+                setSelectedDevices(newSelected);
+            };
+
+            const selectAllUnassigned = () => {
+                if (selectedDevices.size === unassignedDevices.length) {
+                    setSelectedDevices(new Set());
+                } else {
+                    setSelectedDevices(new Set(unassignedDevices.map(d => d.id)));
+                }
+            };
+
+            const assignSelectedDevices = async () => {
+                if (selectedDevices.size === 0) {
+                    alert('Please select devices to assign');
+                    return;
+                }
+
+                try {
+                    const payload = {
+                        data: {
+                            type: "orgDeviceActivities",
+                            attributes: {
+                                activityType: "ASSIGN_DEVICES"
+                            },
+                            relationships: {
+                                mdmServer: {
+                                    data: {
+                                        type: "mdmServers",
+                                        id: selectedMdmServer.id
+                                    }
+                                },
+                                devices: {
+                                    data: Array.from(selectedDevices).map(deviceId => ({
+                                        type: "orgDevices",
+                                        id: deviceId
+                                    }))
+                                }
+                            }
+                        }
+                    };
+
+                    const response = await fetch(`/api/${customerId}/orgDeviceActivities`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        alert(`Successfully assigned ${selectedDevices.size} devices!`);
+                        await fetchDevices(); // Refresh device list
+                        showMdmServerDetail(selectedMdmServer); // Refresh the MDM detail view
+                    } else {
+                        alert('Error assigning devices');
+                    }
+                } catch (error) {
+                    alert('Error assigning devices: ' + error.message);
+                }
+            };
+
             if (!customerId) {
                 return (
                     <div className="container">
@@ -389,16 +509,9 @@
                                             </div>
                                             <button 
                                                 className="mdm-toggle"
-                                                onClick={() => {
-                                                    const unassignedDevices = devices.filter(d => d.attributes?.status === 'UNASSIGNED');
-                                                    if (unassignedDevices.length > 0) {
-                                                        alert(`Found ${unassignedDevices.length} unassigned devices that can be assigned to this server.`);
-                                                    } else {
-                                                        alert('No unassigned devices available for assignment.');
-                                                    }
-                                                }}
+                                                onClick={() => showMdmServerDetail(server)}
                                             >
-                                                View Assignable Devices
+                                                View Device Assignments
                                             </button>
                                         </div>
                                     ))}
@@ -651,6 +764,139 @@
                                     <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
                                         Close
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MDM Server Detail Modal */}
+                    {showMdmDetail && selectedMdmServer && (
+                        <div className="mdm-detail-modal" onClick={() => setShowMdmDetail(false)}>
+                            <div className="mdm-detail-content" onClick={(e) => e.stopPropagation()}>
+                                <div className="mdm-detail-header">
+                                    <h2 style={{margin: 0}}>
+                                        {selectedMdmServer.attributes?.serverName || selectedMdmServer.attributes?.name || selectedMdmServer.id}
+                                    </h2>
+                                    <p style={{margin: '0.5rem 0 0 0', opacity: 0.9}}>
+                                        {selectedMdmServer.attributes?.organizationName || 'MDM Server Management'}
+                                    </p>
+                                </div>
+                                <div className="mdm-detail-body">
+                                    <div className="device-sections">
+                                        <div className="device-section">
+                                            <h4>
+                                                Assigned Devices ({assignedToServer.length})
+                                                <span style={{fontSize: '0.875rem', fontWeight: 'normal', color: '#6b7280', marginLeft: '0.5rem'}}>
+                                                    Currently managed by this server
+                                                </span>
+                                            </h4>
+                                            <div className="device-list">
+                                                {assignedToServer.length > 0 ? (
+                                                    assignedToServer.map(device => (
+                                                        <div key={device.id} className="device-item">
+                                                            <div className="device-item-info">
+                                                                <div className="device-item-name">
+                                                                    {device.attributes?.model || 'Unknown Model'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    Serial: {device.attributes?.serialNumber || 'N/A'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    ID: {device.id.substring(0, 16)}...
+                                                                </div>
+                                                            </div>
+                                                            <div className="status-indicator">
+                                                                <div className="status-dot assigned"></div>
+                                                                <span style={{fontSize: '0.75rem', color: '#10b981'}}>ASSIGNED</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No devices currently assigned to this server.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="device-section">
+                                            <h4>
+                                                Unassigned Devices ({unassignedDevices.length})
+                                                <span style={{fontSize: '0.875rem', fontWeight: 'normal', color: '#6b7280', marginLeft: '0.5rem'}}>
+                                                    Available for assignment
+                                                </span>
+                                            </h4>
+                                            <div className="device-list">
+                                                {unassignedDevices.length > 0 ? (
+                                                    unassignedDevices.map(device => (
+                                                        <div 
+                                                            key={device.id} 
+                                                            className={`device-item ${selectedDevices.has(device.id) ? 'selected' : ''}`}
+                                                            onClick={() => toggleDeviceSelection(device.id)}
+                                                            style={{cursor: 'pointer'}}
+                                                        >
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="device-checkbox"
+                                                                checked={selectedDevices.has(device.id)}
+                                                                onChange={() => toggleDeviceSelection(device.id)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <div className="device-item-info">
+                                                                <div className="device-item-name">
+                                                                    {device.attributes?.model || 'Unknown Model'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    Serial: {device.attributes?.serialNumber || 'N/A'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    ID: {device.id.substring(0, 16)}...
+                                                                </div>
+                                                            </div>
+                                                            <div className="status-indicator">
+                                                                <div className="status-dot unassigned"></div>
+                                                                <span style={{fontSize: '0.75rem', color: '#f59e0b'}}>UNASSIGNED</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices available.
+                                                    </p>
+                                                )}
+                                            </div>
+                                            
+                                            {unassignedDevices.length > 0 && (
+                                                <div className="bulk-actions">
+                                                    <button 
+                                                        className="btn btn-secondary"
+                                                        onClick={selectAllUnassigned}
+                                                    >
+                                                        {selectedDevices.size === unassignedDevices.length ? 'Deselect All' : 'Select All'}
+                                                    </button>
+                                                    <button 
+                                                        className="btn assign-btn"
+                                                        onClick={assignSelectedDevices}
+                                                        disabled={selectedDevices.size === 0}
+                                                    >
+                                                        Assign Selected ({selectedDevices.size})
+                                                    </button>
+                                                    <span className="selected-count">
+                                                        {selectedDevices.size} of {unassignedDevices.length} selected
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginTop: '2rem', textAlign: 'center'}}>
+                                        <button 
+                                            className="btn back-btn"
+                                            onClick={() => setShowMdmDetail(false)}
+                                        >
+                                            Back to Device Overview
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
