@@ -253,7 +253,7 @@ class AppleSchoolManagerAPI:
         return {"data": reseller}
 
     def create_org_device_activity(self, payload):
-        """Create an orgDeviceActivity (e.g., ASSIGN_DEVICES or UNASSIGN_DEVICES)"""
+        """Create an orgDeviceActivity (e.g., ASSIGN_DEVICES)"""
         return self._make_api_request(
             "/orgDeviceActivities", 
             method='POST',
@@ -261,32 +261,31 @@ class AppleSchoolManagerAPI:
             headers={"Content-Type": "application/json"}
         )
 
-    def unassign_devices(self, device_ids):
-        """Unassign devices from their current MDM server"""
-        if isinstance(device_ids, str):
-            device_ids = [device_ids]
-        
+    def get_org_device_activity(self, activity_id):
+        """Get a specific orgDeviceActivity by ID"""
+        return self._make_api_request(f"/orgDeviceActivities/{activity_id}")
+
+    def unassign_devices(self, mdm_server_id, device_ids):
+        """
+        Unassign devices from a server by sending an ASSIGN_DEVICES activity with mdmServer = null.
+        """
         payload = {
             "data": {
                 "type": "orgDeviceActivities",
                 "attributes": {
-                    "activityType": "UNASSIGN_DEVICES"
+                    "activityType": "ASSIGN_DEVICES"
                 },
                 "relationships": {
+                    "mdmServer": {
+                        "data": None
+                    },
                     "devices": {
                         "data": [
-                            {
-                                "type": "orgDevices",
-                                "id": device_id
-                            } for device_id in device_ids
+                            {"type": "orgDevices", "id": device_id}
+                            for device_id in device_ids
                         ]
                     }
                 }
             }
         }
-        
         return self.create_org_device_activity(payload)
-
-    def get_org_device_activity(self, activity_id):
-        """Get a specific orgDeviceActivity by ID"""
-        return self._make_api_request(f"/orgDeviceActivities/{activity_id}")

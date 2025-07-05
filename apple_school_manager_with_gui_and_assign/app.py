@@ -501,55 +501,24 @@ def customer_devices_page(customer_id):
     """Serve the customer-specific devices page"""
     return send_from_directory(FRONTEND_DIR, "customer-devices.html")
 
-@customer_ns.route('/<string:customer_id>/devices/unassign')
-class UnassignDevices(Resource):
-    @api.expect(api.model('UnassignDevices', {
-        "device_ids": fields.List(fields.String, required=True, description="List of device IDs to unassign")
-    }), validate=True)
-    @api.response(201, "Devices unassigned")
+@customer_ns.route('/<string:customer_id>/orgDeviceActivities/unassign')
+class OrgDeviceActivitiesUnassign(Resource):
     def post(self, customer_id):
         """
-        Unassign devices from their current MDM servers.
-        
+        Unassign one or more devices from any MDM server.
         Exempel på body:
         {
-          "device_ids": ["XABC123X0ABC123X0", "XDEF456X0DEF456X0"]
+          "device_ids": ["XABC123X0ABC123X0", ...]
         }
         """
-        try:
-            asm, err, code = get_asm_instance(customer_id)
-            if err: return jsonify(err), code
-            
-            payload = request.get_json()
-            device_ids = payload.get('device_ids', [])
-            
-            if not device_ids:
-                return {"error": "device_ids is required and cannot be empty"}, 400
-            
-            result = asm.unassign_devices(device_ids)
-            return result, 201
-            
-        except Exception as e:
-            logger.error(f"Error unassigning devices for customer {customer_id}: {e}")
-            return {"error": "Failed to unassign devices"}, 500
-
-@customer_ns.route('/<string:customer_id>/devices/<string:device_id>/unassign')
-class UnassignSingleDevice(Resource):
-    @api.response(201, "Device unassigned")
-    def post(self, customer_id, device_id):
-        """
-        Unassign a single device from its current MDM server.
-        """
-        try:
-            asm, err, code = get_asm_instance(customer_id)
-            if err: return jsonify(err), code
-            
-            result = asm.unassign_devices([device_id])
-            return result, 201
-            
-        except Exception as e:
-            logger.error(f"Error unassigning device {device_id} for customer {customer_id}: {e}")
-            return {"error": "Failed to unassign device"}, 500
+        asm, err, code = get_asm_instance(customer_id)
+        if err: return jsonify(err), code
+        data = request.get_json()
+        device_ids = data.get("device_ids")
+        if not device_ids or not isinstance(device_ids, list):
+            return {"error": "device_ids (list) required"}, 400
+        result = asm.unassign_devices(mdm_server_id=None, device_ids=device_ids)
+        return result, 201
 
 if __name__ == "__main__":
     # Use environment variables for Docker compatibility
