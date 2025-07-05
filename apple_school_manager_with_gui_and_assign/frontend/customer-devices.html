@@ -145,8 +145,6 @@
             const [filteredDevices, setFilteredDevices] = useState([]);
             const [loading, setLoading] = useState(true);
             const [customerInfo, setCustomerInfo] = useState(null);
-            const [selectedDevice, setSelectedDevice] = useState(null);
-            const [showModal, setShowModal] = useState(false);
             const [mdmServers, setMdmServers] = useState([]);
             const [filters, setFilters] = useState({
                 status: 'all',
@@ -168,7 +166,6 @@
             const [assignedDeviceSearch, setAssignedDeviceSearch] = useState('');
             const [filteredAssignedDevices, setFilteredAssignedDevices] = useState([]);
             const [filteredUnassignedDevices, setFilteredUnassignedDevices] = useState([]);
-            // const [deviceServerMap, setDeviceServerMap] = useState(new Map()); // This is no longer needed
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
 
@@ -205,13 +202,6 @@
                 }
             };
 
-            // This entire function is the cause of the multiple requests and will be removed.
-            /*
-            const fetchDeviceServerAssignments = async () => {
-                // ... function content ...
-            };
-            */
-
             useEffect(() => {
                 if (customerId) {
                     fetchDevices();
@@ -219,14 +209,6 @@
                     fetchMdmServers();
                 }
             }, [customerId]);
-
-            /* This useEffect is removed as it calls the function we are deleting.
-            useEffect(() => {
-                if (devices.length > 0) {
-                    fetchDeviceServerAssignments();
-                }
-            }, [devices]);
-            */
 
             useEffect(() => {
                 applyFilters();
@@ -325,107 +307,12 @@
                 }));
             };
 
-            const viewDeviceDetails = async (deviceId) => {
-                try {
-                    const response = await fetch(`/api/${customerId}/devices/${deviceId}`);
-                    const device = await response.json();
-                    
-                    // If device is assigned, also fetch the assigned server info
-                    if (device.data?.attributes?.status === 'ASSIGNED') {
-                        try {
-                            const serverResponse = await fetch(`/api/${customerId}/devices/${deviceId}/assignedServer`);
-                            const serverData = await serverResponse.json();
-                            device.assignedServer = serverData;
-                        } catch (error) {
-                            console.warn('Could not fetch assigned server info:', error);
-                        }
-                    }
-                    
-                    setSelectedDevice(device);
-                    setShowModal(true);
-                } catch (error) {
-                    alert('Error fetching device details');
-                }
-            };
-
             const getAssignedServerName = (device) => {
                 // This function is now simplified. It will only show a generic status on the main card.
-                // The detailed server name will be fetched and shown in the modal.
                 if (device.attributes?.status === 'ASSIGNED') {
                     return 'Assigned';
                 }
                 return 'N/A';
-            };
-
-            const assignDeviceToMDM = async (deviceId, mdmServerId) => {
-                if (!mdmServerId) {
-                    alert("Please select an MDM server.");
-                    return;
-                }
-                try {
-                    const payload = {
-                        data: {
-                            type: "orgDeviceActivities",
-                            attributes: {
-                                activityType: "ASSIGN_DEVICES"
-                            },
-                            relationships: {
-                                mdmServer: {
-                                    data: {
-                                        type: "mdmServers",
-                                        id: mdmServerId
-                                    }
-                                },
-                                devices: {
-                                    data: [{
-                                        type: "orgDevices",
-                                        id: deviceId
-                                    }]
-                                }
-                            }
-                        }
-                    };
-
-                    const response = await fetch(`/api/${customerId}/orgDeviceActivities`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        alert('Device assigned successfully!');
-                        fetchDevices(); // Refresh device list
-                        setShowModal(false);
-                    } else {
-                        const errorData = await response.json();
-                        alert(`Error assigning device: ${errorData.error || response.statusText}`);
-                    }
-                } catch (error) {
-                    alert('Error assigning device: ' + error.message);
-                }
-            };
-
-            const unassignDevice = async (deviceId) => {
-                if (!window.confirm('Are you sure you want to unassign this device?')) return;
-                try {
-                    const response = await fetch(`/api/${customerId}/orgDeviceActivities/unassign`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ device_ids: [deviceId] })
-                    });
-                    if (response.ok) {
-                        alert('Device unassigned successfully!');
-                        fetchDevices();
-                        setShowModal(false); // Close modal after unassigning
-                    } else {
-                        const errorData = await response.json();
-                        alert(`Failed to unassign device: ${errorData.error || response.statusText}`);
-                    }
-                } catch (err) {
-                    alert('Error unassigning device: ' + err);
-                }
             };
 
             const quickFilter = (filterType) => {
@@ -798,13 +685,12 @@
                                 </div>
 
                                 <div className="device-actions">
-                                    <button 
+                                    <a 
+                                        href={`/frontend/device-details.html?customer=${customerId}&device=${device.id}`}
                                         className="btn btn-primary"
-                                        onClick={() => viewDeviceDetails(device.id)}
                                     >
                                         View Details
-                                    </button>
-                                    {/* The assign/unassign buttons are now inside the modal */}
+                                    </a>
                                 </div>
                             </div>
                         ))}
@@ -816,39 +702,6 @@
                             <button className="btn btn-secondary" onClick={() => quickFilter('reset')} style={{marginTop: '1rem'}}>
                                 Clear All Filters
                             </button>
-                        </div>
-                    )}
-
-                    {/* Device Details/Management Modal */}
-                    {showModal && selectedDevice && (
-                        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-                            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                                <div className="modal-header">
-                                    <h2 className="modal-title">
-                                        Device Details & Management
-                                    </h2>
-                                </div>
-                                <div className="modal-body">
-                                    {selectedDevice.data ? (
-                                        <DeviceDetailView 
-                                            device={selectedDevice} 
-                                            mdmServers={mdmServers}
-                                            onAssign={assignDeviceToMDM}
-                                            onUnassign={unassignDevice}
-                                        />
-                                    ) : (
-                                        <div className="loading">
-                                            <div className="spinner"></div>
-                                            <p>Loading device details...</p>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="modal-footer">
-                                    <button className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                                        Close
-                                    </button>
-                                </div>
-                            </div>
                         </div>
                     )}
 
@@ -864,7 +717,7 @@
                                         {selectedMdmServer.attributes?.organizationName || 'MDM Server Management'}
                                     </p>
                                 </div>
-                                <div className="mdm-detail-body">
+                                <div className="mdm-detail_body">
                                     <div className="device-sections">
                                         <div className="device-section">
                                             <h4>
@@ -889,6 +742,153 @@
                                             </div>
                                             
                                             <div className="device-list">
+                                                {filteredAssignedDevices.length > 0 ? (
+                                                    filteredAssignedDevices.map(device => (
+                                                        <div key={device.id} className="device-item">
+                                                            <div className="device-item-info">
+                                                                <div className="device-item-name">
+                                                                    {device.attributes?.deviceModel || 'Unknown Model'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    Serial: {device.attributes?.serialNumber || 'N/A'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    ID: {device.id.substring(0, 16)}...
+                                                                </div>
+                                                            </div>
+                                                            <div className="status-indicator">
+                                                                <div className="status-dot assigned"></div>
+                                                                <span style={{fontSize: '0.75rem', color: '#10b981'}}>ASSIGNED</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : assignedDeviceSearch ? (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No assigned devices match your search criteria.
+                                                    </p>
+                                                ) : (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No devices currently assigned to this server.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="device-section">
+                                            <h4>
+                                                Unassigned Devices ({unassignedDevices.length})
+                                                <span style={{fontSize: '0.875rem', fontWeight: 'normal', color: '#6b7280', marginLeft: '0.5rem'}}>
+                                                    Available for assignment
+                                                </span>
+                                            </h4>
+                                            
+                                            <div className="device-search">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search unassigned devices by serial number, model, or device ID..."
+                                                    value={unassignedDeviceSearch}
+                                                    onChange={(e) => setUnassignedDeviceSearch(e.target.value)}
+                                                />
+                                                {unassignedDeviceSearch && (
+                                                    <div className="device-search-results">
+                                                        Showing {filteredUnassignedDevices.length} of {unassignedDevices.length} unassigned devices
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="device-list">
+                                                {filteredUnassignedDevices.length > 0 ? (
+                                                    filteredUnassignedDevices.map(device => (
+                                                        <div key={device.id} className={`device-item ${selectedDevices.has(device.id) ? 'selected' : ''}`} onClick={() => toggleDeviceSelection(device.id)}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="device-checkbox"
+                                                                checked={selectedDevices.has(device.id)}
+                                                                onChange={() => toggleDeviceSelection(device.id)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <div className="device-item-info">
+                                                                <div className="device-item-name">
+                                                                    {device.attributes?.deviceModel || 'Unknown Model'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    Serial: {device.attributes?.serialNumber || 'N/A'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    ID: {device.id.substring(0, 16)}...
+                                                                </div>
+                                                            </div>
+                                                            <div className="status-indicator">
+                                                                <div className="status-dot unassigned"></div>
+                                                                <span style={{fontSize: '0.75rem', color: '#f59e0b'}}>UNASSIGNED</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : unassignedDeviceSearch ? (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices match your search criteria.
+                                                        <br />
+                                                        <button 
+                                                            style={{marginTop: '1rem', background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', textDecoration: 'underline'}}
+                                                            onClick={() => setUnassignedDeviceSearch('')}
+                                                        >
+                                                            Clear search
+                                                        </button>
+                                                    </p>
+                                                ) : (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices available.
+                                                    </p>
+                                                )}
+                                            </div>
+                                            
+                                            {filteredUnassignedDevices.length > 0 && (
+                                                <div className="bulk-actions">
+                                                    <button 
+                                                        className="btn btn-secondary"
+                                                        onClick={selectAllFilteredUnassigned}
+                                                    >
+                                                        {filteredUnassignedDevices.length > 0 && filteredUnassignedDevices.every(d => selectedDevices.has(d.id))
+                                                            ? 'Deselect All Filtered' 
+                                                            : 'Select All Filtered'}
+                                                    </button>
+                                                    <button 
+                                                        className="btn assign-btn"
+                                                        onClick={assignSelectedDevices}
+                                                        disabled={selectedDevices.size === 0}
+                                                    >
+                                                        Assign Selected ({selectedDevices.size})
+                                                    </button>
+                                                    <span className="selected-count">
+                                                        {selectedDevices.size} selected
+                                                        {unassignedDeviceSearch && ` (${filteredUnassignedDevices.length} filtered)`}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginTop: '2rem', textAlign: 'center'}}>
+                                        <button 
+                                            className="btn back-btn"
+                                            onClick={() => setShowMdmDetail(false)}
+                                        >
+                                            Back to Device Overview
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DeviceManagement />);
+    </script>
+</body>
+</html>
                                                 {filteredAssignedDevices.length > 0 ? (
                                                     filteredAssignedDevices.map(device => (
                                                         <div key={device.id} className="device-item">
