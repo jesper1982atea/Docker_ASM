@@ -78,6 +78,15 @@
         .status-dot { width: 8px; height: 8px; border-radius: 50%; }
         .status-dot.assigned { background: #10b981; }
         .status-dot.unassigned { background: #f59e0b; }
+        
+        /* MDM Servers section */
+        .mdm-servers-section { background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .mdm-servers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; margin-top: 1rem; }
+        .mdm-server-card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 1rem; }
+        .mdm-server-name { font-weight: 600; margin-bottom: 0.5rem; color: #1f2937; }
+        .mdm-server-info { font-size: 0.875rem; color: #6b7280; }
+        .mdm-toggle { background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.875rem; margin-top: 0.5rem; }
+        .mdm-toggle:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -104,6 +113,7 @@
             const [advancedFilters, setAdvancedFilters] = useState({
                 showAdvanced: false
             });
+            const [showMdmServers, setShowMdmServers] = useState(false);
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
 
@@ -354,7 +364,59 @@
                             <div className="stat-number" style={{color: '#ef4444'}}>{stats.reseller}</div>
                             <div className="stat-label">From Reseller</div>
                         </div>
+                        <div className="stat-card" style={{borderLeftColor: '#6366f1', cursor: 'pointer'}} onClick={() => setShowMdmServers(!showMdmServers)}>
+                            <div className="stat-number" style={{color: '#6366f1'}}>{mdmServers.length}</div>
+                            <div className="stat-label">MDM Servers</div>
+                        </div>
                     </div>
+
+                    {showMdmServers && (
+                        <div className="mdm-servers-section">
+                            <h3 style={{margin: '0 0 1rem 0', color: '#1f2937'}}>Available MDM Servers</h3>
+                            {mdmServers.length > 0 ? (
+                                <div className="mdm-servers-grid">
+                                    {mdmServers.map(server => (
+                                        <div key={server.id} className="mdm-server-card">
+                                            <div className="mdm-server-name">
+                                                {server.attributes?.serverName || server.attributes?.name || server.id}
+                                            </div>
+                                            <div className="mdm-server-info">
+                                                <div><strong>Organization:</strong> {server.attributes?.organizationName || 'N/A'}</div>
+                                                <div><strong>Server ID:</strong> {server.id}</div>
+                                                {server.attributes?.serverUrl && (
+                                                    <div><strong>URL:</strong> {server.attributes.serverUrl}</div>
+                                                )}
+                                            </div>
+                                            <button 
+                                                className="mdm-toggle"
+                                                onClick={() => {
+                                                    const unassignedDevices = devices.filter(d => d.attributes?.status === 'UNASSIGNED');
+                                                    if (unassignedDevices.length > 0) {
+                                                        alert(`Found ${unassignedDevices.length} unassigned devices that can be assigned to this server.`);
+                                                    } else {
+                                                        alert('No unassigned devices available for assignment.');
+                                                    }
+                                                }}
+                                            >
+                                                View Assignable Devices
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p style={{color: '#6b7280', textAlign: 'center', margin: '2rem 0'}}>
+                                    No MDM servers configured for this customer.
+                                </p>
+                            )}
+                            <button 
+                                className="btn btn-secondary" 
+                                onClick={() => setShowMdmServers(false)}
+                                style={{marginTop: '1rem'}}
+                            >
+                                Hide MDM Servers
+                            </button>
+                        </div>
+                    )}
 
                     <div className="filters">
                         <div className="filter-row">
