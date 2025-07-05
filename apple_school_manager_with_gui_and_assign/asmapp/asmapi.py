@@ -253,13 +253,39 @@ class AppleSchoolManagerAPI:
         return {"data": reseller}
 
     def create_org_device_activity(self, payload):
-        """Create an orgDeviceActivity (e.g., ASSIGN_DEVICES)"""
+        """Create an orgDeviceActivity (e.g., ASSIGN_DEVICES or UNASSIGN_DEVICES)"""
         return self._make_api_request(
             "/orgDeviceActivities", 
             method='POST',
             json=payload,
             headers={"Content-Type": "application/json"}
         )
+
+    def unassign_devices(self, device_ids):
+        """Unassign devices from their current MDM server"""
+        if isinstance(device_ids, str):
+            device_ids = [device_ids]
+        
+        payload = {
+            "data": {
+                "type": "orgDeviceActivities",
+                "attributes": {
+                    "activityType": "UNASSIGN_DEVICES"
+                },
+                "relationships": {
+                    "devices": {
+                        "data": [
+                            {
+                                "type": "orgDevices",
+                                "id": device_id
+                            } for device_id in device_ids
+                        ]
+                    }
+                }
+            }
+        }
+        
+        return self.create_org_device_activity(payload)
 
     def get_org_device_activity(self, activity_id):
         """Get a specific orgDeviceActivity by ID"""

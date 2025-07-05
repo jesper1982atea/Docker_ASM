@@ -475,98 +475,227 @@
                 }
             };
 
-            const quickFilter = (filterType) => {
-                const newFilters = { ...filters };
-                
-                switch(filterType) {
-                    case 'unassigned':
-                        newFilters.status = 'unassigned';
-                        break;
-                    case 'assigned':
-                        newFilters.status = 'assigned';
-                        break;
-                    case 'manual':
-                        newFilters.purchaseSource = 'MANUALLY_ADDED';
-                        break;
-                    case 'reseller':
-                        newFilters.purchaseSource = 'RESELLER';
-                        break;
-                    case 'reset':
-                        newFilters.status = 'all';
-                        newFilters.model = 'all';
-                        newFilters.purchaseSource = 'all';
-                        newFilters.color = 'all';
-                        newFilters.search = '';
-                        break;
-                }
-                
-                setFilters(newFilters);
-            };
-
-            const showMdmServerDetail = async (server) => {
-                setSelectedMdmServer(server);
-                
-                // Get assigned devices for this server using the server mapping
-                const assigned = devices.filter(device => {
-                    const serverInfo = deviceServerMap.get(device.id);
-                    return serverInfo && serverInfo.id === server.id;
-                });
-                
-                // Get unassigned devices
-                const unassigned = devices.filter(device => 
-                    device.attributes?.status === 'UNASSIGNED'
-                );
-                
-                setAssignedToServer(assigned);
-                setUnassignedDevices(unassigned);
-                setSelectedDevices(new Set());
-                setAssignedDeviceSearch('');
-                setUnassignedDeviceSearch('');
-                setShowMdmDetail(true);
-            };
-
-            const toggleDeviceSelection = (deviceId) => {
-                const newSelected = new Set(selectedDevices);
-                if (newSelected.has(deviceId)) {
-                    newSelected.delete(deviceId);
-                } else {
-                    newSelected.add(deviceId);
-                }
-                setSelectedDevices(newSelected);
-            };
-
-            const selectAllUnassigned = () => {
-                if (selectedDevices.size === unassignedDevices.length) {
-                    setSelectedDevices(new Set());
-                } else {
-                    setSelectedDevices(new Set(unassignedDevices.map(d => d.id)));
-                }
-            };
-
-            const selectAllFilteredUnassigned = () => {
-                if (selectedDevices.size === filteredUnassignedDevices.length && filteredUnassignedDevices.length > 0) {
-                    // Deselect all filtered devices
-                    const newSelected = new Set(selectedDevices);
-                    filteredUnassignedDevices.forEach(device => {
-                        newSelected.delete(device.id);
-                    });
-                    setSelectedDevices(newSelected);
-                } else {
-                    // Select all filtered devices
-                    const newSelected = new Set(selectedDevices);
-                    filteredUnassignedDevices.forEach(device => {
-                        newSelected.add(device.id);
-                    });
-                    setSelectedDevices(newSelected);
-                }
-            };
-
-            const assignSelectedDevices = async () => {
-                if (selectedDevices.size === 0) {
-                    alert('Please select devices to assign');
+            const unassignDevice = async (deviceId) => {
+                if (!confirm('Are you sure you want to unassign this device from its MDM server?')) {
                     return;
                 }
 
+                try {
+                    const response = await fetch(`/api/${customerId}/devices/${deviceId}/unassign`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        alert('Device unassigned successfully!');
+                        fetchDevices(); // Refresh device list
+                        setShowModal(false);
+                    } else {
+                        alert('Error unassigning device');
+                    }
+                } catch (error) {
+                    alert('Error unassigning device: ' + error.message);
+                }
+            };
+
+            const unassignSelectedDevices = async () => {
+                if (selectedDevices.size === 0) {
+                    alert('Please select devices to unassign');
+                    return;
+                }
+
+                if (!confirm(`Are you sure you want to unassign ${selectedDevices.size} devices from this MDM server?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/${customerId}/devices/unassign`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            device_ids: Array.from(selectedDevices)
+                        })
+                    });
+
+                    if (response.ok) {
+                        alert(`Successfully unassigned ${selectedDevices.size} devices!`);
+                        await fetchDevices(); // Refresh device list
+                        setSelectedDevices(new Set()); // Clear selection
+                    } else {
+                        alert('Error unassigning devices');
+                    }
+                } catch (error) {
+                    alert('Error unassigning devices: ' + error.message);
+                }
+            };
+
+            useEffect(() => {
+                if (customerId) {
+                    fetchDevices();
+                    fetchCustomerInfo();
+                    fetchMdmServers();
+                }
+            }, [customerId]);
+
+            useEffect(() => {
+                if (devices.length > 0) {
+                    fetchDeviceServerAssignments();
+                }
+            }, [devices]);
+
+            useEffect(() => {
+                applyFilters();
+            }, [devices, filters]);
+
+            useEffect(() => {
+                // Filter assigned devices based on search
+                if (assignedDeviceSearch) {
+                    const filtered = assignedToServer.filter(device =>
+                        device.attributes?.serialNumber?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(assignedDeviceSearch.toLowerCase())
+                    );
+                    setFilteredAssignedDevices(filtered);
+                } else {
+                    setFilteredAssignedDevices(assignedToServer);
+                }
+            }, [assignedToServer, assignedDeviceSearch]);
+
+            useEffect(() => {
+                // Filter unassigned devices based on search
+                if (unassignedDeviceSearch) {
+                    const filtered = unassignedDevices.filter(device =>
+                        device.attributes?.serialNumber?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase())
+                    );
+                    setFilteredUnassignedDevices(filtered);
+                } else {
+                    setFilteredUnassignedDevices(unassignedDevices);
+                }
+            }, [unassignedDevices, unassignedDeviceSearch]);
+
+            const applyFilters = () => {
+                let filtered = devices;
+
+                if (filters.status !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.status?.toLowerCase() === filters.status.toLowerCase()
+                    );
+                }
+
+                if (filters.model !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.deviceModel?.includes(filters.model)
+                    );
+                }
+
+                if (filters.purchaseSource !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.purchaseSourceType === filters.purchaseSource
+                    );
+                }
+
+                if (filters.color !== 'all') {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.color?.toLowerCase() === filters.color.toLowerCase()
+                    );
+                }
+
+                if (filters.search) {
+                    filtered = filtered.filter(device => 
+                        device.attributes?.serialNumber?.toLowerCase().includes(filters.search.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(filters.search.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(filters.search.toLowerCase())
+                    );
+                }
+
+                setFilteredDevices(filtered);
+            };
+
+            const getStats = () => {
+                const assigned = devices.filter(d => d.attributes?.status === 'ASSIGNED').length;
+                const unassigned = devices.filter(d => d.attributes?.status === 'UNASSIGNED').length;
+                const manual = devices.filter(d => d.attributes?.purchaseSourceType === 'MANUALLY_ADDED').length;
+                const reseller = devices.filter(d => d.attributes?.purchaseSourceType === 'RESELLER').length;
+
+                return { assigned, unassigned, manual, reseller, total: devices.length };
+            };
+
+            const getUniqueValues = (field) => {
+                const values = new Set();
+                devices.forEach(device => {
+                    const value = field === 'model' ? device.attributes?.deviceModel : device.attributes?.[field];
+                    if (value) {
+                        values.add(value);
+                    }
+                });
+                return Array.from(values).sort();
+            };
+
+            const handleFilterChange = (filterType, value) => {
+                setFilters(prev => ({
+                    ...prev,
+                    [filterType]: value
+                }));
+            };
+
+            const viewDeviceDetails = async (deviceId) => {
+                try {
+                    const response = await fetch(`/api/${customerId}/devices/${deviceId}`);
+                    const device = await response.json();
+                    
+                    // If device is assigned, also fetch the assigned server info
+                    if (device.data?.attributes?.status === 'ASSIGNED') {
+                        try {
+                            const serverResponse = await fetch(`/api/${customerId}/devices/${deviceId}/assignedServer`);
+                            const serverData = await serverResponse.json();
+                            device.assignedServer = serverData;
+                        } catch (error) {
+                            console.warn('Could not fetch assigned server info:', error);
+                        }
+                    }
+                    
+                    setSelectedDevice(device);
+                    setShowModal(true);
+                } catch (error) {
+                    alert('Error fetching device details');
+                }
+            };
+
+            const getAssignedServerName = (device) => {
+                // First check our cached server mapping
+                const serverInfo = deviceServerMap.get(device.id);
+                if (serverInfo) {
+                    return serverInfo.name;
+                }
+                
+                // Fallback to relationships if available
+                const assignedServerId = device.relationships?.assignedServer?.data?.id;
+                if (assignedServerId) {
+                    const server = mdmServers.find(s => s.id === assignedServerId);
+                    if (server) {
+                        return server.attributes?.serverName || server.attributes?.name || server.id;
+                    }
+                    return assignedServerId.substring(0, 8) + '...';
+                }
+                
+                // Check if we're still loading assignments
+                const hasAssignedDevices = devices.some(d => d.attributes?.status === 'ASSIGNED');
+                const hasAnyServerMappings = deviceServerMap.size > 0;
+                
+                if (hasAssignedDevices && !hasAnyServerMappings) {
+                    return 'Loading...';
+                } else {
+                    return 'Not assigned';
+                }
+            };
+
+            const assignDeviceToMDM = async (deviceId, mdmServerId) => {
                 try {
                     const payload = {
                         data: {
@@ -578,14 +707,14 @@
                                 mdmServer: {
                                     data: {
                                         type: "mdmServers",
-                                        id: selectedMdmServer.id
+                                        id: mdmServerId
                                     }
                                 },
                                 devices: {
-                                    data: Array.from(selectedDevices).map(deviceId => ({
+                                    data: [{
                                         type: "orgDevices",
                                         id: deviceId
-                                    }))
+                                    }]
                                 }
                             }
                         }
@@ -600,14 +729,72 @@
                     });
 
                     if (response.ok) {
-                        alert(`Successfully assigned ${selectedDevices.size} devices!`);
-                        await fetchDevices(); // Refresh device list
-                        // Don't refresh MDM detail view immediately, let useEffect handle it
+                        alert('Device assigned successfully!');
+                        fetchDevices(); // Refresh device list
+                        setShowModal(false);
                     } else {
-                        alert('Error assigning devices');
+                        alert('Error assigning device');
                     }
                 } catch (error) {
-                    alert('Error assigning devices: ' + error.message);
+                    alert('Error assigning device: ' + error.message);
+                }
+            };
+
+            const unassignDevice = async (deviceId) => {
+                if (!confirm('Are you sure you want to unassign this device from its MDM server?')) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/${customerId}/devices/${deviceId}/unassign`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        alert('Device unassigned successfully!');
+                        fetchDevices(); // Refresh device list
+                        setShowModal(false);
+                    } else {
+                        alert('Error unassigning device');
+                    }
+                } catch (error) {
+                    alert('Error unassigning device: ' + error.message);
+                }
+            };
+
+            const unassignSelectedDevices = async () => {
+                if (selectedDevices.size === 0) {
+                    alert('Please select devices to unassign');
+                    return;
+                }
+
+                if (!confirm(`Are you sure you want to unassign ${selectedDevices.size} devices from this MDM server?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/${customerId}/devices/unassign`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            device_ids: Array.from(selectedDevices)
+                        })
+                    });
+
+                    if (response.ok) {
+                        alert(`Successfully unassigned ${selectedDevices.size} devices!`);
+                        await fetchDevices(); // Refresh device list
+                        setSelectedDevices(new Set()); // Clear selection
+                    } else {
+                        alert('Error unassigning devices');
+                    }
+                } catch (error) {
+                    alert('Error unassigning devices: ' + error.message);
                 }
             };
 
@@ -867,6 +1054,15 @@
                                             Assign Device
                                         </button>
                                     )}
+                                    {device.attributes?.status === 'ASSIGNED' && (
+                                        <button 
+                                            className="btn"
+                                            style={{background: '#ef4444', color: 'white'}}
+                                            onClick={() => unassignDevice(device.id)}
+                                        >
+                                            Unassign Device
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         ))}
@@ -934,6 +1130,20 @@
                                                 <div className="detail-item">
                                                     <div className="detail-label">Color</div>
                                                     <div className="detail-value">{selectedDevice.data.attributes.color}</div>
+                                                </div>
+                                            )}
+                                            {selectedDevice.data.attributes?.status === 'ASSIGNED' && (
+                                                <div className="detail-item">
+                                                    <div className="detail-label">Actions</div>
+                                                    <div className="detail-value">
+                                                        <button 
+                                                            className="btn"
+                                                            style={{background: '#ef4444', color: 'white', fontSize: '0.75rem'}}
+                                                            onClick={() => unassignDevice(selectedDevice.data.id)}
+                                                        >
+                                                            Unassign from MDM
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
