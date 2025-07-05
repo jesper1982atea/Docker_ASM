@@ -25,5 +25,5 @@ EXPOSE 6000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:6000/health || exit 1
 
-# Starta appen direkt med app.py för att använda environment variables
+# Starta appen - app.py finns nu i /app eftersom vi kopierade innehållet från apple_school_manager_with_gui_and_assign/
 CMD ["python", "app.py"]
