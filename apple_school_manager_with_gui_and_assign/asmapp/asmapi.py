@@ -8,6 +8,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Global token cache to share tokens between instances
+_global_token_cache = {}
+_global_cache_lock = threading.Lock()
+
 class AppleSchoolManagerAPI:
     def __init__(self, pem_path, client_id, team_id, key_id, scope="school.api", manager_type="school"):
         self.pem_path = pem_path
@@ -15,6 +19,9 @@ class AppleSchoolManagerAPI:
         self.team_id = team_id
         self.key_id = key_id
         self.manager_type = manager_type
+        
+        # Create a unique key for this configuration
+        self.cache_key = f"{client_id}:{team_id}:{key_id}:{manager_type}"
         
         # Set scope and API URL based on manager type
         if manager_type == "business":
@@ -25,11 +32,7 @@ class AppleSchoolManagerAPI:
             self.api_url = "https://api-school.apple.com/v1"
             
         self.token_url = "https://account.apple.com/auth/oauth2/v2/token"
-        self.access_token = None
-        self.token_expiry = 0
-        self._token_lock = threading.Lock()
-        self._last_token_request = 0
-        self._min_token_interval = 60  # Minimum 60 seconds between token requests
+        self._min_token_interval = 120  # Increased to 2 minutes between token requests
 
     def _generate_jwt(self):
         now = int(time.time())
@@ -51,32 +54,35 @@ class AppleSchoolManagerAPI:
         return jwt.encode(headers, payload, private_key.export_key(format='PEM')).decode()
 
     def get_access_token(self):
-        """Get access token with improved caching and rate limiting"""
-        with self._token_lock:
+        """Get access token with global caching and rate limiting"""
+        with _global_cache_lock:
             current_time = time.time()
             
-            # Check if we have a valid token with sufficient buffer time (5 minutes)
-            if (self.access_token and 
-                current_time < self.token_expiry - 300):  # 5 minute buffer
-                logger.debug(f"Using cached token, expires in {self.token_expiry - current_time:.0f} seconds")
-                return self.access_token
-            
-            # Rate limiting: don't request tokens too frequently
-            time_since_last_request = current_time - self._last_token_request
-            if time_since_last_request < self._min_token_interval:
-                if self.access_token:
-                    # Use existing token even if close to expiry
-                    logger.warning(f"Rate limiting token requests, using existing token")
-                    return self.access_token
-                else:
-                    # Wait if we absolutely need a new token
-                    wait_time = self._min_token_interval - time_since_last_request
-                    logger.warning(f"Rate limiting: waiting {wait_time:.1f} seconds before token request")
-                    time.sleep(wait_time)
+            # Check global cache first
+            cache_entry = _global_token_cache.get(self.cache_key)
+            if cache_entry:
+                token, expiry, last_request = cache_entry
+                
+                # Check if we have a valid token with sufficient buffer time (10 minutes)
+                if current_time < expiry - 600:  # 10 minute buffer
+                    logger.debug(f"Using cached global token, expires in {expiry - current_time:.0f} seconds")
+                    return token
+                
+                # Rate limiting: don't request tokens too frequently
+                time_since_last_request = current_time - last_request
+                if time_since_last_request < self._min_token_interval:
+                    if token and current_time < expiry:
+                        # Use existing token even if close to expiry
+                        logger.warning(f"Rate limiting token requests, using existing token")
+                        return token
+                    else:
+                        # Wait if we absolutely need a new token
+                        wait_time = self._min_token_interval - time_since_last_request
+                        logger.warning(f"Rate limiting: waiting {wait_time:.1f} seconds before token request")
+                        time.sleep(wait_time)
             
             try:
-                logger.info("Requesting new access token from Apple")
-                self._last_token_request = time.time()
+                logger.info(f"Requesting new access token from Apple for {self.cache_key}")
                 
                 assertion = self._generate_jwt()
                 data = {
@@ -90,26 +96,37 @@ class AppleSchoolManagerAPI:
                 response = requests.post(self.token_url, data=data, timeout=30)
                 
                 if response.status_code == 429:
-                    logger.error("Rate limited by Apple. Waiting 60 seconds before retry.")
-                    time.sleep(60)
+                    logger.error("Rate limited by Apple. Waiting 120 seconds before retry.")
+                    time.sleep(120)  # Wait longer for rate limits
                     response = requests.post(self.token_url, data=data, timeout=30)
                 
                 response.raise_for_status()
                 json_data = response.json()
                 
-                self.access_token = json_data["access_token"]
+                access_token = json_data["access_token"]
                 expires_in = json_data.get("expires_in", 3600)  # Default 1 hour
-                self.token_expiry = int(time.time()) + expires_in
+                token_expiry = int(time.time()) + expires_in
                 
-                logger.info(f"New token acquired, expires in {expires_in} seconds")
-                return self.access_token
+                # Store in global cache
+                _global_token_cache[self.cache_key] = (access_token, token_expiry, time.time())
+                
+                logger.info(f"New token acquired and cached, expires in {expires_in} seconds")
+                return access_token
                 
             except requests.exceptions.RequestException as e:
                 logger.error(f"Failed to get access token: {e}")
-                if self.access_token:
-                    logger.warning("Using existing token despite refresh failure")
-                    return self.access_token
+                # Try to use any existing token from cache as last resort
+                cache_entry = _global_token_cache.get(self.cache_key)
+                if cache_entry and cache_entry[0]:
+                    logger.warning("Using existing cached token despite refresh failure")
+                    return cache_entry[0]
                 raise
+
+    @property
+    def token_expiry(self):
+        """Get token expiry from global cache"""
+        cache_entry = _global_token_cache.get(self.cache_key)
+        return cache_entry[1] if cache_entry else 0
 
     def _auth_headers(self):
         return {
@@ -138,16 +155,16 @@ class AppleSchoolManagerAPI:
                     raise ValueError(f"Unsupported method: {method}")
                 
                 if response.status_code == 401 and attempt < max_retries - 1:
-                    logger.warning("Got 401, refreshing token and retrying")
-                    # Force token refresh
-                    with self._token_lock:
-                        self.access_token = None
-                        self.token_expiry = 0
+                    logger.warning("Got 401, clearing cached token and retrying")
+                    # Clear cached token for this configuration
+                    with _global_cache_lock:
+                        if self.cache_key in _global_token_cache:
+                            del _global_token_cache[self.cache_key]
                     continue
                 
                 if response.status_code == 429:
                     logger.warning(f"Rate limited (429), waiting before retry (attempt {attempt + 1})")
-                    time.sleep(60)
+                    time.sleep(120)  # Wait longer for rate limits
                     continue
                     
                 response.raise_for_status()

@@ -206,31 +206,50 @@
             };
 
             const fetchDeviceServerAssignments = async () => {
-                // Fetch assigned server info for all assigned devices
+                // Fetch assigned server info for all assigned devices with rate limiting
                 const assignedDevices = devices.filter(d => d.attributes?.status === 'ASSIGNED');
+                if (assignedDevices.length === 0) return;
+                
                 const serverMap = new Map();
+                const batchSize = 5; // Process 5 devices at a time
+                const delay = 1000; // Wait 1 second between batches
                 
-                const promises = assignedDevices.map(async (device) => {
-                    try {
-                        const response = await fetch(`/api/${customerId}/devices/${device.id}/assignedServer`);
-                        if (response.ok) {
-                            const serverData = await response.json();
-                            if (serverData.data) {
-                                serverMap.set(device.id, {
-                                    id: serverData.data.id,
-                                    name: serverData.data.attributes?.serverName || 
-                                          serverData.data.attributes?.name || 
-                                          serverData.data.id
-                                });
+                logger.info(`Fetching server assignments for ${assignedDevices.length} devices in batches of ${batchSize}`);
+                
+                for (let i = 0; i < assignedDevices.length; i += batchSize) {
+                    const batch = assignedDevices.slice(i, i + batchSize);
+                    
+                    const promises = batch.map(async (device) => {
+                        try {
+                            const response = await fetch(`/api/${customerId}/devices/${device.id}/assignedServer`);
+                            if (response.ok) {
+                                const serverData = await response.json();
+                                if (serverData.data) {
+                                    serverMap.set(device.id, {
+                                        id: serverData.data.id,
+                                        name: serverData.data.attributes?.serverName || 
+                                              serverData.data.attributes?.name || 
+                                              serverData.data.id
+                                    });
+                                }
                             }
+                        } catch (error) {
+                            console.warn(`Could not fetch server for device ${device.id}:`, error);
                         }
-                    } catch (error) {
-                        console.warn(`Could not fetch server for device ${device.id}:`, error);
+                    });
+                    
+                    await Promise.all(promises);
+                    
+                    // Update UI with current progress
+                    setDeviceServerMap(new Map(serverMap));
+                    
+                    // Wait before next batch (except for the last batch)
+                    if (i + batchSize < assignedDevices.length) {
+                        await new Promise(resolve => setTimeout(resolve, delay));
                     }
-                });
+                }
                 
-                await Promise.all(promises);
-                setDeviceServerMap(serverMap);
+                console.log(`Completed fetching server assignments for ${serverMap.size} devices`);
             };
 
             useEffect(() => {

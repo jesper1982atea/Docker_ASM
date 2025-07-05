@@ -9,6 +9,7 @@ import shutil
 import logging
 import time
 import requests
+import threading
 
 # Configure logging
 logging.basicConfig(
@@ -24,7 +25,17 @@ api = Api(app, title="Apple School Manager API", version="1.0", description="API
 CUSTOMERS_DIR = os.path.join(os.path.dirname(__file__), "admin_api", "customers")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 
+# Cache for ASM instances to avoid recreating them
+_asm_instance_cache = {}
+_cache_lock = threading.Lock()
+
 def get_asm_instance(customer_id):
+    """Get ASM instance with caching to avoid multiple token requests"""
+    with _cache_lock:
+        # Check if we have a cached instance
+        if customer_id in _asm_instance_cache:
+            return _asm_instance_cache[customer_id], None, None
+    
     path = os.path.join(CUSTOMERS_DIR, customer_id)
     if not os.path.exists(path):
         return None, {"error": "Customer not found"}, 404
@@ -38,6 +49,11 @@ def get_asm_instance(customer_id):
             key_id=meta["key_id"],
             manager_type=meta.get("manager_type", "school")
         )
+        
+        # Cache the instance
+        with _cache_lock:
+            _asm_instance_cache[customer_id] = asm
+        
         return asm, None, None
     except Exception as e:
         logger.error(f"Failed to create ASM instance for customer {customer_id}: {e}")
