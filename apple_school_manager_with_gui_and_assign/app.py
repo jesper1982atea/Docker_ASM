@@ -517,7 +517,7 @@ class OrgDeviceActivitiesUnassign(Resource):
         device_ids = data.get("device_ids")
         if not device_ids or not isinstance(device_ids, list):
             return {"error": "device_ids (list) required"}, 400
-        result = asm.unassign_devices(mdm_server_id=None, device_ids=device_ids)
+        result = asm.unassign_devices(device_ids=device_ids)
         return result, 201
 
 if __name__ == "__main__":

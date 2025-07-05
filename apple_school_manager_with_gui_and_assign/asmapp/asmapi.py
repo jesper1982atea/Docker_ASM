@@ -266,9 +266,9 @@ class AppleSchoolManagerAPI:
         return self._make_api_request(f"/orgDeviceActivities/{activity_id}")
 
     # function to assign devices to a server
-    def unassign_devices(self, mdm_server_id, device_ids):
+    def unassign_devices(self, device_ids):
         """
-        Unassign devices from a server by sending an ASSIGN_DEVICES activity with mdmServer = null.
+        Unassign devices from any server by sending an UNASSIGN_DEVICES activity.
         """
         payload = {
             "data": {
@@ -277,9 +277,6 @@ class AppleSchoolManagerAPI:
                     "activityType": "UNASSIGN_DEVICES"
                 },
                 "relationships": {
-                    "mdmServer": {
-                        "data": None
-                    },
                     "devices": {
                         "data": [
                             {"type": "orgDevices", "id": device_id}
