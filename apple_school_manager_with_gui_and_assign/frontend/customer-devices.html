@@ -168,7 +168,6 @@
             const [assignedDeviceSearch, setAssignedDeviceSearch] = useState('');
             const [filteredAssignedDevices, setFilteredAssignedDevices] = useState([]);
             const [filteredUnassignedDevices, setFilteredUnassignedDevices] = useState([]);
-            const [deviceServerMap, setDeviceServerMap] = useState(new Map());
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
 
@@ -205,69 +204,6 @@
                 }
             };
 
-            const fetchDeviceServerAssignments = async () => {
-                // Fetch assigned server info for all assigned devices with rate limiting
-                const assignedDevices = devices.filter(d => d.attributes?.status === 'ASSIGNED');
-                if (assignedDevices.length === 0) {
-                    console.log('No assigned devices found');
-                    return;
-                }
-                
-                const serverMap = new Map();
-                const batchSize = 3; // Reduced batch size to be more conservative
-                const delay = 2000; // Increased delay to 2 seconds between batches
-                
-                console.log(`Fetching server assignments for ${assignedDevices.length} devices in batches of ${batchSize}`);
-                
-                try {
-                    for (let i = 0; i < assignedDevices.length; i += batchSize) {
-                        const batch = assignedDevices.slice(i, i + batchSize);
-                        console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(assignedDevices.length / batchSize)}`);
-                        
-                        const promises = batch.map(async (device) => {
-                            try {
-                                const response = await fetch(`/api/${customerId}/devices/${device.id}/assignedServer`);
-                                if (response.ok) {
-                                    const serverData = await response.json();
-                                    if (serverData.data) {
-                                        serverMap.set(device.id, {
-                                            id: serverData.data.id,
-                                            name: serverData.data.attributes?.serverName || 
-                                                  serverData.data.attributes?.name || 
-                                                  serverData.data.id
-                                        });
-                                    }
-                                } else if (response.status === 404) {
-                                    // Device not assigned to any server, skip silently
-                                    console.log(`Device ${device.id} not assigned to any server`);
-                                } else {
-                                    console.warn(`Failed to fetch server for device ${device.id}: ${response.status}`);
-                                }
-                            } catch (error) {
-                                console.warn(`Could not fetch server for device ${device.id}:`, error);
-                            }
-                        });
-                        
-                        await Promise.all(promises);
-                        
-                        // Update UI with current progress immediately
-                        setDeviceServerMap(new Map(serverMap));
-                        
-                        // Wait before next batch (except for the last batch)
-                        if (i + batchSize < assignedDevices.length) {
-                            console.log(`Waiting ${delay}ms before next batch...`);
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                        }
-                    }
-                    
-                    console.log(`Completed fetching server assignments for ${serverMap.size} devices`);
-                } catch (error) {
-                    console.error('Error in fetchDeviceServerAssignments:', error);
-                    // Even if there's an error, update with whatever we got
-                    setDeviceServerMap(new Map(serverMap));
-                }
-            };
-
             useEffect(() => {
                 if (customerId) {
                     fetchDevices();
@@ -275,12 +211,6 @@
                     fetchMdmServers();
                 }
             }, [customerId]);
-
-            useEffect(() => {
-                if (devices.length > 0) {
-                    fetchDeviceServerAssignments();
-                }
-            }, [devices]);
 
             useEffect(() => {
                 applyFilters();
@@ -403,34 +333,24 @@
             };
 
             const getAssignedServerName = (device) => {
-                // First check our cached server mapping
-                const serverInfo = deviceServerMap.get(device.id);
-                if (serverInfo) {
-                    return serverInfo.name;
-                }
-                
-                // Fallback to relationships if available
-                const assignedServerId = device.relationships?.assignedServer?.data?.id;
-                if (assignedServerId) {
-                    const server = mdmServers.find(s => s.id === assignedServerId);
-                    if (server) {
-                        return server.attributes?.serverName || server.attributes?.name || server.id;
+                // This function is now simplified. It will only show a generic status on the main card.
+                // The detailed server name will be fetched and shown in the modal.
+                if (device.attributes?.status === 'ASSIGNED') {
+                    const assignedServerId = device.relationships?.assignedServer?.data?.id;
+                    if (assignedServerId) {
+                        // We can show the ID if we want, or just "Assigned"
+                        return `Assigned (ID: ...${assignedServerId.slice(-6)})`;
                     }
-                    return assignedServerId.substring(0, 8) + '...';
+                    return 'Assigned';
                 }
-                
-                // Check if we're still loading assignments
-                const hasAssignedDevices = devices.some(d => d.attributes?.status === 'ASSIGNED');
-                const hasAnyServerMappings = deviceServerMap.size > 0;
-                
-                if (hasAssignedDevices && !hasAnyServerMappings) {
-                    return 'Loading...';
-                } else {
-                    return 'Not assigned';
-                }
+                return 'N/A';
             };
 
             const assignDeviceToMDM = async (deviceId, mdmServerId) => {
+                if (!mdmServerId) {
+                    alert("Please select an MDM server.");
+                    return;
+                }
                 try {
                     const payload = {
                         data: {
@@ -486,7 +406,7 @@
                     if (response.ok) {
                         alert('Device unassigned successfully!');
                         fetchDevices();
-                        setShowModal(false);
+                        setShowModal(false); // Close modal after unassigning
                     } else {
                         alert('Failed to unassign device');
                     }
@@ -846,11 +766,11 @@
                                     </div>
                                     <div className="info-item">
                                         <div className="info-label">
-                                            {device.attributes?.status === 'ASSIGNED' ? 'Assigned to' : 'Color'}
+                                            {device.attributes?.status === 'ASSIGNED' ? 'Assignment' : 'Color'}
                                         </div>
                                         <div className="info-value">
                                             {device.attributes?.status === 'ASSIGNED' 
-                                                ? getAssignedServerName(device)
+                                                ? 'Assigned'
                                                 : (device.attributes?.color || 'N/A')
                                             }
                                         </div>
@@ -864,26 +784,7 @@
                                     >
                                         View Details
                                     </button>
-                                    {device.attributes?.status === 'UNASSIGNED' && (
-                                        <button 
-                                            className="btn btn-secondary"
-                                            onClick={() => {
-                                                setSelectedDevice(device);
-                                                setShowModal(true);
-                                            }}
-                                        >
-                                            Assign Device
-                                        </button>
-                                    )}
-                                    {device.attributes?.status === 'ASSIGNED' && (
-                                        <button 
-                                            className="btn btn-secondary"
-                                            style={{background: '#ef4444', color: 'white'}}
-                                            onClick={() => unassignDevice(device.id)}
-                                        >
-                                            Unassign
-                                        </button>
-                                    )}
+                                    {/* The assign/unassign buttons are now inside the modal */}
                                 </div>
                             </div>
                         ))}
@@ -904,95 +805,25 @@
                             <div className="modal" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
                                     <h2 className="modal-title">
-                                        {selectedDevice.data ? 'Device Details' : 'Device Management'}
+                                        {selectedDevice.data ? 'Device Details & Management' : 'Assign Device'}
                                     </h2>
                                 </div>
                                 <div className="modal-body">
                                     {selectedDevice.data ? (
-                                        // Detailed view
-                                        <div className="detail-grid">
-                                            <div className="detail-item">
-                                                <div className="detail-label">Device ID</div>
-                                                <div className="detail-value">{selectedDevice.data.id}</div>
-                                            </div>
-                                            <div className="detail-item">
-                                                <div className="detail-label">Model</div>
-                                                <div className="detail-value">{selectedDevice.data.attributes?.deviceModel || 'N/A'}</div>
-                                            </div>
-                                            <div className="detail-item">
-                                                <div className="detail-label">Serial Number</div>
-                                                <div className="detail-value">{selectedDevice.data.attributes?.serialNumber || 'N/A'}</div>
-                                            </div>
-                                            <div className="detail-item">
-                                                <div className="detail-label">Status</div>
-                                                <div className="detail-value">
-                                                    <div className="status-indicator">
-                                                        <div className={`status-dot ${selectedDevice.data.attributes?.status?.toLowerCase()}`}></div>
-                                                        {selectedDevice.data.attributes?.status || 'Unknown'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="detail-item">
-                                                <div className="detail-label">Purchase Source</div>
-                                                <div className="detail-value">{selectedDevice.data.attributes?.purchaseSourceType || 'N/A'}</div>
-                                            </div>
-                                            {selectedDevice.data.attributes?.status === 'ASSIGNED' && (
-                                                <div className="detail-item">
-                                                    <div className="detail-label">Assigned MDM Server</div>
-                                                    <div className="detail-value">
-                                                        {selectedDevice.assignedServer?.data?.attributes?.serverName || 
-                                                         selectedDevice.assignedServer?.data?.attributes?.name ||
-                                                         getAssignedServerName(selectedDevice.data) ||
-                                                         'Unknown Server'}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {selectedDevice.data.attributes?.color && (
-                                                <div className="detail-item">
-                                                    <div className="detail-label">Color</div>
-                                                    <div className="detail-value">{selectedDevice.data.attributes.color}</div>
-                                                </div>
-                                            )}
-                                        </div>
+                                        // Detailed view for any device
+                                        <DeviceDetailView 
+                                            device={selectedDevice} 
+                                            mdmServers={mdmServers}
+                                            onAssign={assignDeviceToMDM}
+                                            onUnassign={unassignDevice}
+                                        />
                                     ) : (
-                                        // Management view for unassigned devices
-                                        <div>
-                                            <div className="detail-grid">
-                                                <div className="detail-item">
-                                                    <div className="detail-label">Device</div>
-                                                    <div className="detail-value">{selectedDevice.attributes?.deviceModel || 'Unknown Model'}</div>
-                                                </div>
-                                                <div className="detail-item">
-                                                    <div className="detail-label">Serial Number</div>
-                                                    <div className="detail-value">{selectedDevice.attributes?.serialNumber || 'N/A'}</div>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="management-section">
-                                                <h3>Assign to MDM Server</h3>
-                                                <div className="action-grid">
-                                                    {mdmServers.map(server => (
-                                                        <div key={server.id} className="action-item">
-                                                            <div className="action-title">{server.attributes?.serverName  || server.attributes?.name || server.id}</div>
-                                                            <div className="action-desc">
-                                                                {server.attributes?.organizationName || 'MDM Server'}
-                                                            </div>
-                                                            <button 
-                                                                className="btn btn-primary"
-                                                                onClick={() => assignDeviceToMDM(selectedDevice.id, server.id)}
-                                                            >
-                                                                Assign Here
-                                                            </button>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                {mdmServers.length === 0 && (
-                                                    <p style={{color: '#6b7280', textAlign: 'center'}}>
-                                                        No MDM servers available for assignment.
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
+                                        // Simplified assignment view for unassigned devices
+                                        <AssignDeviceView
+                                            device={selectedDevice}
+                                            mdmServers={mdmServers}
+                                            onAssign={assignDeviceToMDM}
+                                        />
                                     )}
                                 </div>
                                 <div className="modal-footer">
@@ -1020,7 +851,7 @@
                                     <div className="device-sections">
                                         <div className="device-section">
                                             <h4>
-                                                Assigned Devices ({assignedToServer.length})
+                                                Devices Assigned to this Server ({assignedToServer.length})
                                                 <span style={{fontSize: '0.875rem', fontWeight: 'normal', color: '#6b7280', marginLeft: '0.5rem'}}>
                                                     Currently managed by this server
                                                 </span>
@@ -1095,6 +926,175 @@
                                                 )}
                                             </div>
                                             
+                                            <div className="device-list">
+                                                {filteredUnassignedDevices.length > 0 ? (
+                                                    filteredUnassignedDevices.map(device => (
+                                                        <div key={device.id} className={`device-item ${selectedDevices.has(device.id) ? 'selected' : ''}`} onClick={() => toggleDeviceSelection(device.id)}>
+                                                            <input 
+                                                                type="checkbox" 
+                                                                className="device-checkbox"
+                                                                checked={selectedDevices.has(device.id)}
+                                                                onChange={() => toggleDeviceSelection(device.id)}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            />
+                                                            <div className="device-item-info">
+                                                                <div className="device-item-name">
+                                                                    {device.attributes?.deviceModel || 'Unknown Model'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    Serial: {device.attributes?.serialNumber || 'N/A'}
+                                                                </div>
+                                                                <div className="device-item-serial">
+                                                                    ID: {device.id.substring(0, 16)}...
+                                                                </div>
+                                                            </div>
+                                                            <div className="status-indicator">
+                                                                <div className="status-dot unassigned"></div>
+                                                                <span style={{fontSize: '0.75rem', color: '#f59e0b'}}>UNASSIGNED</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : unassignedDeviceSearch ? (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices match your search criteria.
+                                                        <br />
+                                                        <button 
+                                                            style={{marginTop: '1rem', background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', textDecoration: 'underline'}}
+                                                            onClick={() => setUnassignedDeviceSearch('')}
+                                                        >
+                                                            Clear search
+                                                        </button>
+                                                    </p>
+                                                ) : (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices available.
+                                                    </p>
+                                                )}
+                                            </div>
+                                            
+                                            {filteredUnassignedDevices.length > 0 && (
+                                                <div className="bulk-actions">
+                                                    <button 
+                                                        className="btn btn-secondary"
+                                                        onClick={selectAllFilteredUnassigned}
+                                                    >
+                                                        {filteredUnassignedDevices.length > 0 && filteredUnassignedDevices.every(d => selectedDevices.has(d.id))
+                                                            ? 'Deselect All Filtered' 
+                                                            : 'Select All Filtered'}
+                                                    </button>
+                                                    <button 
+                                                        className="btn assign-btn"
+                                                        onClick={assignSelectedDevices}
+                                                        disabled={selectedDevices.size === 0}
+                                                    >
+                                                        Assign Selected ({selectedDevices.size})
+                                                    </button>
+                                                    <span className="selected-count">
+                                                        {selectedDevices.size} selected
+                                                        {unassignedDeviceSearch && ` (${filteredUnassignedDevices.length} filtered)`}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginTop: '2rem', textAlign: 'center'}}>
+                                        <button 
+                                            className="btn back-btn"
+                                            onClick={() => setShowMdmDetail(false)}
+                                        >
+                                            Back to Device Overview
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+            
+                    function DeviceDetailView({ device, mdmServers, onAssign, onUnassign }) {
+                        const [selectedMdm, setSelectedMdm] = useState('');
+                        const { data, assignedServer } = device;
+                        const attributes = data?.attributes || {};
+                        const assignedServerInfo = assignedServer?.data?.attributes;
+                        const assignedServerId = assignedServer?.data?.id;
+
+                        return (
+                            <div>
+                                <div className="detail-grid">
+                                    <div className="detail-item"><div className="detail-label">Model</div><div className="detail-value">{attributes.deviceModel || 'N/A'}</div></div>
+                                    <div className="detail-item"><div className="detail-label">Serial</div><div className="detail-value">{attributes.serialNumber || 'N/A'}</div></div>
+                                    <div className="detail-item"><div className="detail-label">Status</div><div className="detail-value">{attributes.status || 'N/A'}</div></div>
+                                    <div className="detail-item"><div className="detail-label">Device ID</div><div className="detail-value">{data.id}</div></div>
+                                </div>
+                                <div className="management-section">
+                                    <h3>Device Assignment</h3>
+                                    {attributes.status === 'ASSIGNED' ? (
+                                        <div>
+                                            <p>Currently assigned to:</p>
+                                            <div className="detail-item" style={{ background: '#eef2ff', borderColor: '#667eea' }}>
+                                                <div className="detail-label">MDM Server</div>
+                                                <div className="detail-value">{assignedServerInfo?.serverName || assignedServerInfo?.name || assignedServerId || 'Loading...'}</div>
+                                            </div>
+                                            <button className="btn btn-secondary" onClick={() => onUnassign(data.id)} style={{marginTop: '1rem', background: '#ef4444', color: 'white'}}>
+                                                Unassign Device
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="action-item">
+                                            <div className="action-title">Assign to MDM Server</div>
+                                            <p>This device is currently unassigned.</p>
+                                            <select value={selectedMdm} onChange={e => setSelectedMdm(e.target.value)} style={{width: '100%', padding: '0.5rem', marginBottom: '1rem', marginTop: '0.5rem'}}>
+                                                <option value="">Select a server...</option>
+                                                {mdmServers.map(server => (
+                                                    <option key={server.id} value={server.id}>
+                                                        {server.attributes?.serverName || server.attributes?.name || server.id}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <button 
+                                                className="btn btn-primary" 
+                                                onClick={() => onAssign(data.id, selectedMdm)}
+                                                disabled={!selectedMdm}
+                                            >
+                                                Assign
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    function AssignDeviceView({ device, mdmServers, onAssign }) {
+                         const [selectedMdm, setSelectedMdm] = useState('');
+                         return (
+                            <div>
+                                <div className="detail-grid">
+                                    <div className="detail-item"><div className="detail-label">Device</div><div className="detail-value">{device.attributes?.deviceModel || 'Unknown Model'}</div></div>
+                                    <div className="detail-item"><div className="detail-label">Serial Number</div><div className="detail-value">{device.attributes?.serialNumber || 'N/A'}</div></div>
+                                </div>
+                                <div className="management-section">
+                                    <h3>Assign to MDM Server</h3>
+                                    <div className="action-grid">
+                                        {mdmServers.map(server => (
+                                            <div key={server.id} className="action-item">
+                                                <div className="action-title">{server.attributes?.serverName  || server.attributes?.name || server.id}</div>
+                                                <div className="action-desc">{server.attributes?.organizationName || 'MDM Server'}</div>
+                                                <button className="btn btn-primary" onClick={() => onAssign(device.id, server.id)}>Assign Here</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    {mdmServers.length === 0 && <p style={{color: '#6b7280', textAlign: 'center'}}>No MDM servers available for assignment.</p>}
+                                </div>
+                            </div>
+                         );
+                    }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DeviceManagement />);
+    </script>
+</body>
+</html>
                                             <div className="device-list">
                                                 {filteredUnassignedDevices.length > 0 ? (
                                                     filteredUnassignedDevices.map(device => (
