@@ -10,7 +10,10 @@ COPY apple_school_manager_with_gui_and_assign/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Kopiera hela projektet
-COPY . .
+COPY apple_school_manager_with_gui_and_assign/ .
+
+# Skapa admin_api/customers katalog
+RUN mkdir -p admin_api/customers
 
 # Lägg till app-katalogen i PYTHONPATH
 ENV PYTHONPATH="/app:${PYTHONPATH}"
