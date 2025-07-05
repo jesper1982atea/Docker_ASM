@@ -615,7 +615,7 @@
                             <div key={device.id} className="device-card">
                                 <div className="device-header">
                                     <div className="device-model">
-                                        {device.attributes?.model || 'Unknown Model'}
+                                        {device.attributes?.deviceModel || 'Unknown Model'}
                                     </div>
                                     <div className="status-indicator">
                                         <div className={`status-dot ${device.attributes?.status?.toLowerCase()}`}></div>
@@ -695,7 +695,7 @@
                                             </div>
                                             <div className="detail-item">
                                                 <div className="detail-label">Model</div>
-                                                <div className="detail-value">{selectedDevice.data.attributes?.model || 'N/A'}</div>
+                                                <div className="detail-value">{selectedDevice.data.attributes?.deviceModel || 'N/A'}</div>
                                             </div>
                                             <div className="detail-item">
                                                 <div className="detail-label">Serial Number</div>
@@ -725,7 +725,7 @@
                                             <div className="detail-grid">
                                                 <div className="detail-item">
                                                     <div className="detail-label">Device</div>
-                                                    <div className="detail-value">{selectedDevice.attributes?.model || 'Unknown Model'}</div>
+                                                    <div className="detail-value">{selectedDevice.attributes?.deviceModel || 'Unknown Model'}</div>
                                                 </div>
                                                 <div className="detail-item">
                                                     <div className="detail-label">Serial Number</div>
