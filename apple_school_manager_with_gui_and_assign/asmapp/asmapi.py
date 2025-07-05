@@ -274,7 +274,7 @@ class AppleSchoolManagerAPI:
             "data": {
                 "type": "orgDeviceActivities",
                 "attributes": {
-                    "activityType": "ASSIGN_DEVICES"
+                    "activityType": "UNASSIGN_DEVICES"
                 },
                 "relationships": {
                     "mdmServer": {
