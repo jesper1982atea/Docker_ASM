@@ -138,6 +138,28 @@
         font-size: 1.05rem;
         color: #174ea6;
       }
+      .token-status {
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        display: inline-block;
+      }
+      .token-valid {
+        background: #d1fae5;
+        color: #065f46;
+      }
+      .token-expired {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .token-error {
+        background: #fee2e2;
+        color: #991b1b;
+      }
+      .customer-info {
+        flex: 1;
+      }
       @media (max-width: 600px) {
         main { padding: 1rem; }
         form { flex-direction: column; }
@@ -155,20 +177,6 @@
     <main>
       <div id="root"></div>
       <div id="swagger-link"></div>
-    </main>
-    <script src="admin.js"></script>
-  </body>
-</html>
-          <input name="key_id" placeholder="Key ID" required />
-          <input type="file" name="pem" accept=".pem" required />
-          <button>Lägg till kund</button>
-        </form>
-      </section>
-      <section>
-        <h2>Befintliga kunder</h2>
-        <ul id="customerList"></ul>
-      </section>
-      <section id="swagger-link"></section>
     </main>
     <script src="admin.js"></script>
   </body>

@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
     const root = document.getElementById('root');
+    const swaggerLinkDiv = document.getElementById('swagger-link');
     
     // Create the form HTML
     root.innerHTML = `
@@ -76,6 +77,8 @@ document.addEventListener('DOMContentLoaded', function() {
                         <span style="color: #666;">(${customer.manager_type === 'business' ? 'Apple Business Manager' : 'Apple School Manager'})</span>
                         <br>
                         <small>ID: ${customer.id}</small>
+                        <br>
+                        <span id="token-${customer.id}" class="token-status">Checking token...</span>
                     </div>
                     <div class="customer-actions">
                         <button class="edit-btn" onclick="editCustomer('${customer.id}')">
@@ -93,11 +96,44 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                 </li>
             `).join('');
+            
+            // Update global swagger link
+            swaggerLinkDiv.innerHTML = `
+                <strong>API-dokumentation:</strong>
+                <a href="/docs" target="_blank">Swagger UI (Alla endpoints)</a>
+            `;
+            
+            // Load token status for each customer
+            customers.forEach(customer => {
+                checkTokenStatus(customer.id);
+            });
         } catch (error) {
             console.error('Fel vid laddning av kunder:', error);
         }
     }
 
+    async function checkTokenStatus(customerId) {
+        try {
+            const response = await fetch(`/api/${customerId}/orgs`);
+            const tokenElement = document.getElementById(`token-${customerId}`);
+            
+            if (response.ok) {
+                tokenElement.textContent = '✓ Token Active';
+                tokenElement.className = 'token-status token-valid';
+            } else if (response.status === 401) {
+                tokenElement.textContent = '⚠ Token Expired';
+                tokenElement.className = 'token-status token-expired';
+            } else {
+                tokenElement.textContent = '✗ Connection Error';
+                tokenElement.className = 'token-status token-error';
+            }
+        } catch (error) {
+            const tokenElement = document.getElementById(`token-${customerId}`);
+            tokenElement.textContent = '✗ Network Error';
+            tokenElement.className = 'token-status token-error';
+        }
+    }
+    
     window.editCustomer = async function(customerId) {
         try {
             const response = await fetch(`/api/customers/${customerId}`);

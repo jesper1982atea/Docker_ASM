@@ -7,6 +7,7 @@ from asmapp.asmapi import AppleSchoolManagerAPI
 import copy
 import shutil
 import logging
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -181,6 +182,26 @@ class ResellerDevices(Resource):
         asm, err, code = get_asm_instance(customer_id)
         if err: return jsonify(err), code
         return asm.get_reseller_devices()
+
+@customer_ns.route('/<string:customer_id>/token-status')
+class TokenStatus(Resource):
+    def get(self, customer_id):
+        """Check if the customer's token is valid by making a simple API call"""
+        try:
+            asm, err, code = get_asm_instance(customer_id)
+            if err: 
+                return {"status": "error", "message": err["error"]}, code
+            
+            # Try to make a simple API call to test the token
+            result = asm.get_orgs()
+            return {
+                "status": "valid", 
+                "message": "Token is active",
+                "token_expires_in": max(0, asm.token_expiry - int(time.time())) if asm.token_expiry else None
+            }
+        except Exception as e:
+            logger.error(f"Token validation failed for customer {customer_id}: {e}")
+            return {"status": "invalid", "message": str(e)}, 401
 
 api.add_namespace(customer_ns)
 
