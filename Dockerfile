@@ -12,6 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Kopiera hela projektet
 COPY apple_school_manager_with_gui_and_assign/ .
 
+# Debug: Lista vad som finns i /app för att se strukturen
+RUN ls -la /app/
+RUN find /app -name "app.py" -type f
+
 # Skapa admin_api/customers katalog
 RUN mkdir -p admin_api/customers
 
