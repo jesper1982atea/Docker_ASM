@@ -67,9 +67,26 @@ class DeviceById(Resource):
 @customer_ns.route('/<string:customer_id>/devices/<string:device_id>/assignedServer')
 class DeviceAssignedServer(Resource):
     def get(self, customer_id, device_id):
-        asm, err, code = get_asm_instance(customer_id)
-        if err: return jsonify(err), code
-        return asm.get_assigned_server(device_id)
+        """Get the MDM server assigned to a specific device"""
+        try:
+            asm, err, code = get_asm_instance(customer_id)
+            if err: 
+                return jsonify(err), code
+            
+            result = asm.get_assigned_server(device_id)
+            return result
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                # Device might not be assigned to any server
+                return {"data": None, "message": "Device not assigned to any MDM server"}, 200
+            else:
+                logger.error(f"HTTP error {e.response.status_code} when fetching assigned server for device {device_id}")
+                return {"error": f"HTTP {e.response.status_code}"}, e.response.status_code
+                
+        except Exception as e:
+            logger.error(f"Error fetching assigned server for device {device_id}: {e}")
+            return {"error": "Failed to fetch assigned server"}, 500
 
 @customer_ns.route('/<string:customer_id>/orgs')
 class Orgs(Resource):

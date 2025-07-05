@@ -184,7 +184,17 @@ class AppleSchoolManagerAPI:
         return self._make_api_request(f"/orgDevices/{device_id}")
 
     def get_assigned_server(self, device_id):
-        return self._make_api_request(f"/orgDevices/{device_id}/assignedServer")
+        """Get the MDM server assigned to a specific device"""
+        try:
+            return self._make_api_request(f"/orgDevices/{device_id}/assignedServer")
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 404:
+                # Device is not assigned to any server
+                logger.debug(f"Device {device_id} is not assigned to any MDM server")
+                return {"data": None}
+            else:
+                # Re-raise other HTTP errors
+                raise
 
     def get_mdm_servers(self, limit=100, fields=None):
         params = {"limit": str(limit)}

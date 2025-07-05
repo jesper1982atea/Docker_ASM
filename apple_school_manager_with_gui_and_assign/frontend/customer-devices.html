@@ -168,48 +168,9 @@
             const [assignedDeviceSearch, setAssignedDeviceSearch] = useState('');
             const [filteredAssignedDevices, setFilteredAssignedDevices] = useState([]);
             const [filteredUnassignedDevices, setFilteredUnassignedDevices] = useState([]);
+            const [deviceServerMap, setDeviceServerMap] = useState(new Map());
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
-
-            useEffect(() => {
-                if (customerId) {
-                    fetchDevices();
-                    fetchCustomerInfo();
-                    fetchMdmServers();
-                }
-            }, [customerId]);
-
-            useEffect(() => {
-                applyFilters();
-            }, [devices, filters]);
-
-            useEffect(() => {
-                // Filter assigned devices based on search
-                if (assignedDeviceSearch) {
-                    const filtered = assignedToServer.filter(device =>
-                        device.attributes?.serialNumber?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
-                        device.attributes?.deviceModel?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
-                        device.id?.toLowerCase().includes(assignedDeviceSearch.toLowerCase())
-                    );
-                    setFilteredAssignedDevices(filtered);
-                } else {
-                    setFilteredAssignedDevices(assignedToServer);
-                }
-            }, [assignedToServer, assignedDeviceSearch]);
-
-            useEffect(() => {
-                // Filter unassigned devices based on search
-                if (unassignedDeviceSearch) {
-                    const filtered = unassignedDevices.filter(device =>
-                        device.attributes?.serialNumber?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
-                        device.attributes?.deviceModel?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
-                        device.id?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase())
-                    );
-                    setFilteredUnassignedDevices(filtered);
-                } else {
-                    setFilteredUnassignedDevices(unassignedDevices);
-                }
-            }, [unassignedDevices, unassignedDeviceSearch]);
 
             const fetchCustomerInfo = async () => {
                 try {
@@ -243,6 +204,80 @@
                     console.error('Error fetching MDM servers:', error);
                 }
             };
+
+            const fetchDeviceServerAssignments = async () => {
+                // Fetch assigned server info for all assigned devices
+                const assignedDevices = devices.filter(d => d.attributes?.status === 'ASSIGNED');
+                const serverMap = new Map();
+                
+                const promises = assignedDevices.map(async (device) => {
+                    try {
+                        const response = await fetch(`/api/${customerId}/devices/${device.id}/assignedServer`);
+                        if (response.ok) {
+                            const serverData = await response.json();
+                            if (serverData.data) {
+                                serverMap.set(device.id, {
+                                    id: serverData.data.id,
+                                    name: serverData.data.attributes?.serverName || 
+                                          serverData.data.attributes?.name || 
+                                          serverData.data.id
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        console.warn(`Could not fetch server for device ${device.id}:`, error);
+                    }
+                });
+                
+                await Promise.all(promises);
+                setDeviceServerMap(serverMap);
+            };
+
+            useEffect(() => {
+                if (customerId) {
+                    fetchDevices();
+                    fetchCustomerInfo();
+                    fetchMdmServers();
+                }
+            }, [customerId]);
+
+            useEffect(() => {
+                if (devices.length > 0) {
+                    fetchDeviceServerAssignments();
+                }
+            }, [devices]);
+
+            useEffect(() => {
+                applyFilters();
+            }, [devices, filters]);
+
+            useEffect(() => {
+                // Filter assigned devices based on search
+                if (assignedDeviceSearch) {
+                    const filtered = assignedToServer.filter(device =>
+                        device.attributes?.serialNumber?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(assignedDeviceSearch.toLowerCase())
+                    );
+                    setFilteredAssignedDevices(filtered);
+                } else {
+                    setFilteredAssignedDevices(assignedToServer);
+                }
+            }, [assignedToServer, assignedDeviceSearch]);
+
+            useEffect(() => {
+                // Filter unassigned devices based on search
+                if (unassignedDeviceSearch) {
+                    const filtered = unassignedDevices.filter(device =>
+                        device.attributes?.serialNumber?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase())
+                    );
+                    setFilteredUnassignedDevices(filtered);
+                } else {
+                    setFilteredUnassignedDevices(unassignedDevices);
+                }
+            }, [unassignedDevices, unassignedDeviceSearch]);
 
             const applyFilters = () => {
                 let filtered = devices;
@@ -333,7 +368,13 @@
             };
 
             const getAssignedServerName = (device) => {
-                // Try to find the server name from relationships first
+                // First check our cached server mapping
+                const serverInfo = deviceServerMap.get(device.id);
+                if (serverInfo) {
+                    return serverInfo.name;
+                }
+                
+                // Fallback to relationships if available
                 const assignedServerId = device.relationships?.assignedServer?.data?.id;
                 if (assignedServerId) {
                     const server = mdmServers.find(s => s.id === assignedServerId);
@@ -342,7 +383,8 @@
                     }
                     return assignedServerId.substring(0, 8) + '...';
                 }
-                return 'Unknown Server';
+                
+                return 'Loading...';
             };
 
             const assignDeviceToMDM = async (deviceId, mdmServerId) => {
@@ -421,9 +463,10 @@
             const showMdmServerDetail = async (server) => {
                 setSelectedMdmServer(server);
                 
-                // Get assigned devices for this server
+                // Get assigned devices for this server using the server mapping
                 const assigned = devices.filter(device => {
-                    return device.relationships?.assignedServer?.data?.id === server.id;
+                    const serverInfo = deviceServerMap.get(device.id);
+                    return serverInfo && serverInfo.id === server.id;
                 });
                 
                 // Get unassigned devices
@@ -516,7 +559,7 @@
                     if (response.ok) {
                         alert(`Successfully assigned ${selectedDevices.size} devices!`);
                         await fetchDevices(); // Refresh device list
-                        showMdmServerDetail(selectedMdmServer); // Refresh the MDM detail view
+                        // Don't refresh MDM detail view immediately, let useEffect handle it
                     } else {
                         alert('Error assigning devices');
                     }
