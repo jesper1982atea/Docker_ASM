@@ -168,6 +168,7 @@
             const [assignedDeviceSearch, setAssignedDeviceSearch] = useState('');
             const [filteredAssignedDevices, setFilteredAssignedDevices] = useState([]);
             const [filteredUnassignedDevices, setFilteredUnassignedDevices] = useState([]);
+            // const [deviceServerMap, setDeviceServerMap] = useState(new Map()); // This is no longer needed
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
 
@@ -204,6 +205,13 @@
                 }
             };
 
+            // This entire function is the cause of the multiple requests and will be removed.
+            /*
+            const fetchDeviceServerAssignments = async () => {
+                // ... function content ...
+            };
+            */
+
             useEffect(() => {
                 if (customerId) {
                     fetchDevices();
@@ -211,6 +219,14 @@
                     fetchMdmServers();
                 }
             }, [customerId]);
+
+            /* This useEffect is removed as it calls the function we are deleting.
+            useEffect(() => {
+                if (devices.length > 0) {
+                    fetchDeviceServerAssignments();
+                }
+            }, [devices]);
+            */
 
             useEffect(() => {
                 applyFilters();
@@ -336,11 +352,6 @@
                 // This function is now simplified. It will only show a generic status on the main card.
                 // The detailed server name will be fetched and shown in the modal.
                 if (device.attributes?.status === 'ASSIGNED') {
-                    const assignedServerId = device.relationships?.assignedServer?.data?.id;
-                    if (assignedServerId) {
-                        // We can show the ID if we want, or just "Assigned"
-                        return `Assigned (ID: ...${assignedServerId.slice(-6)})`;
-                    }
                     return 'Assigned';
                 }
                 return 'N/A';
@@ -388,7 +399,8 @@
                         fetchDevices(); // Refresh device list
                         setShowModal(false);
                     } else {
-                        alert('Error assigning device');
+                        const errorData = await response.json();
+                        alert(`Error assigning device: ${errorData.error || response.statusText}`);
                     }
                 } catch (error) {
                     alert('Error assigning device: ' + error.message);
@@ -408,7 +420,8 @@
                         fetchDevices();
                         setShowModal(false); // Close modal after unassigning
                     } else {
-                        alert('Failed to unassign device');
+                        const errorData = await response.json();
+                        alert(`Failed to unassign device: ${errorData.error || response.statusText}`);
                     }
                 } catch (err) {
                     alert('Error unassigning device: ' + err);
@@ -446,6 +459,12 @@
             const showMdmServerDetail = async (server) => {
                 setSelectedMdmServer(server);
                 
+                // This logic needs to be updated to not rely on deviceServerMap
+                // For now, we will disable this part to fix the main issue.
+                alert("Viewing devices by server is temporarily disabled to improve performance. Please filter by 'Assigned' status instead.");
+                return;
+
+                /*
                 // Get assigned devices for this server using the server mapping
                 const assigned = devices.filter(device => {
                     const serverInfo = deviceServerMap.get(device.id);
@@ -463,6 +482,7 @@
                 setAssignedDeviceSearch('');
                 setUnassignedDeviceSearch('');
                 setShowMdmDetail(true);
+                */
             };
 
             const toggleDeviceSelection = (deviceId) => {
@@ -770,7 +790,7 @@
                                         </div>
                                         <div className="info-value">
                                             {device.attributes?.status === 'ASSIGNED' 
-                                                ? 'Assigned'
+                                                ? getAssignedServerName(device)
                                                 : (device.attributes?.color || 'N/A')
                                             }
                                         </div>
@@ -805,12 +825,11 @@
                             <div className="modal" onClick={(e) => e.stopPropagation()}>
                                 <div className="modal-header">
                                     <h2 className="modal-title">
-                                        {selectedDevice.data ? 'Device Details & Management' : 'Assign Device'}
+                                        Device Details & Management
                                     </h2>
                                 </div>
                                 <div className="modal-body">
                                     {selectedDevice.data ? (
-                                        // Detailed view for any device
                                         <DeviceDetailView 
                                             device={selectedDevice} 
                                             mdmServers={mdmServers}
@@ -818,12 +837,10 @@
                                             onUnassign={unassignDevice}
                                         />
                                     ) : (
-                                        // Simplified assignment view for unassigned devices
-                                        <AssignDeviceView
-                                            device={selectedDevice}
-                                            mdmServers={mdmServers}
-                                            onAssign={assignDeviceToMDM}
-                                        />
+                                        <div className="loading">
+                                            <div className="spinner"></div>
+                                            <p>Loading device details...</p>
+                                        </div>
                                     )}
                                 </div>
                                 <div className="modal-footer">
@@ -1033,7 +1050,7 @@
                                             <p>Currently assigned to:</p>
                                             <div className="detail-item" style={{ background: '#eef2ff', borderColor: '#667eea' }}>
                                                 <div className="detail-label">MDM Server</div>
-                                                <div className="detail-value">{assignedServerInfo?.serverName || assignedServerInfo?.name || assignedServerId || 'Loading...'}</div>
+                                                <div className="detail-value">{assignedServerInfo?.serverName || assignedServerInfo?.name || assignedServerId || 'Fetching server info...'}</div>
                                             </div>
                                             <button className="btn btn-secondary" onClick={() => onUnassign(data.id)} style={{marginTop: '1rem', background: '#ef4444', color: 'white'}}>
                                                 Unassign Device
@@ -1065,28 +1082,11 @@
                         );
                     }
 
-                    function AssignDeviceView({ device, mdmServers, onAssign }) {
-                         const [selectedMdm, setSelectedMdm] = useState('');
-                         return (
-                            <div>
-                                <div className="detail-grid">
-                                    <div className="detail-item"><div className="detail-label">Device</div><div className="detail-value">{device.attributes?.deviceModel || 'Unknown Model'}</div></div>
-                                    <div className="detail-item"><div className="detail-label">Serial Number</div><div className="detail-value">{device.attributes?.serialNumber || 'N/A'}</div></div>
-                                </div>
-                                <div className="management-section">
-                                    <h3>Assign to MDM Server</h3>
-                                    <div className="action-grid">
-                                        {mdmServers.map(server => (
-                                            <div key={server.id} className="action-item">
-                                                <div className="action-title">{server.attributes?.serverName  || server.attributes?.name || server.id}</div>
-                                                <div className="action-desc">{server.attributes?.organizationName || 'MDM Server'}</div>
-                                                <button className="btn btn-primary" onClick={() => onAssign(device.id, server.id)}>Assign Here</button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                    {mdmServers.length === 0 && <p style={{color: '#6b7280', textAlign: 'center'}}>No MDM servers available for assignment.</p>}
-                                </div>
-                            </div>
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<DeviceManagement />);
+    </script>
+</body>
+</html>
                          );
                     }
 
