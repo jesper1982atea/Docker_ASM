@@ -206,7 +206,7 @@
 
                 if (filters.model !== 'all') {
                     filtered = filtered.filter(device => 
-                        device.attributes?.model?.includes(filters.model)
+                        device.attributes?.deviceModel?.includes(filters.model)
                     );
                 }
 
@@ -225,7 +225,7 @@
                 if (filters.search) {
                     filtered = filtered.filter(device => 
                         device.attributes?.serialNumber?.toLowerCase().includes(filters.search.toLowerCase()) ||
-                        device.attributes?.model?.toLowerCase().includes(filters.search.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(filters.search.toLowerCase()) ||
                         device.id?.toLowerCase().includes(filters.search.toLowerCase())
                     );
                 }
@@ -245,7 +245,7 @@
             const getUniqueValues = (field) => {
                 const values = new Set();
                 devices.forEach(device => {
-                    const value = device.attributes?.[field];
+                    const value = field === 'model' ? device.attributes?.deviceModel : device.attributes?.[field];
                     if (value) {
                         values.add(value);
                     }
@@ -796,7 +796,7 @@
                                                         <div key={device.id} className="device-item">
                                                             <div className="device-item-info">
                                                                 <div className="device-item-name">
-                                                                    {device.attributes?.model || 'Unknown Model'}
+                                                                    {device.attributes?.deviceModel || 'Unknown Model'}
                                                                 </div>
                                                                 <div className="device-item-serial">
                                                                     Serial: {device.attributes?.serialNumber || 'N/A'}
@@ -844,7 +844,7 @@
                                                             />
                                                             <div className="device-item-info">
                                                                 <div className="device-item-name">
-                                                                    {device.attributes?.model || 'Unknown Model'}
+                                                                    {device.attributes?.deviceModel || 'Unknown Model'}
                                                                 </div>
                                                                 <div className="device-item-serial">
                                                                     Serial: {device.attributes?.serialNumber || 'N/A'}
