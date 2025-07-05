@@ -111,6 +111,12 @@
         .back-btn { background: #6b7280; color: white; }
         .back-btn:hover { background: #4b5563; }
         
+        /* Device search in MDM detail */
+        .device-search { margin-bottom: 1rem; }
+        .device-search input { width: 100%; padding: 0.75rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 0.875rem; }
+        .device-search input:focus { outline: none; border-color: #6366f1; }
+        .device-search-results { font-size: 0.875rem; color: #6b7280; margin-top: 0.5rem; }
+        
         @media (max-width: 900px) {
             .device-sections { grid-template-columns: 1fr; }
             .mdm-detail-content { width: 98%; }
@@ -147,6 +153,10 @@
             const [selectedDevices, setSelectedDevices] = useState(new Set());
             const [assignedToServer, setAssignedToServer] = useState([]);
             const [unassignedDevices, setUnassignedDevices] = useState([]);
+            const [unassignedDeviceSearch, setUnassignedDeviceSearch] = useState('');
+            const [assignedDeviceSearch, setAssignedDeviceSearch] = useState('');
+            const [filteredAssignedDevices, setFilteredAssignedDevices] = useState([]);
+            const [filteredUnassignedDevices, setFilteredUnassignedDevices] = useState([]);
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
 
@@ -161,6 +171,34 @@
             useEffect(() => {
                 applyFilters();
             }, [devices, filters]);
+
+            useEffect(() => {
+                // Filter assigned devices based on search
+                if (assignedDeviceSearch) {
+                    const filtered = assignedToServer.filter(device =>
+                        device.attributes?.serialNumber?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(assignedDeviceSearch.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(assignedDeviceSearch.toLowerCase())
+                    );
+                    setFilteredAssignedDevices(filtered);
+                } else {
+                    setFilteredAssignedDevices(assignedToServer);
+                }
+            }, [assignedToServer, assignedDeviceSearch]);
+
+            useEffect(() => {
+                // Filter unassigned devices based on search
+                if (unassignedDeviceSearch) {
+                    const filtered = unassignedDevices.filter(device =>
+                        device.attributes?.serialNumber?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
+                        device.attributes?.deviceModel?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase()) ||
+                        device.id?.toLowerCase().includes(unassignedDeviceSearch.toLowerCase())
+                    );
+                    setFilteredUnassignedDevices(filtered);
+                } else {
+                    setFilteredUnassignedDevices(unassignedDevices);
+                }
+            }, [unassignedDevices, unassignedDeviceSearch]);
 
             const fetchCustomerInfo = async () => {
                 try {
@@ -360,6 +398,8 @@
                 setAssignedToServer(assigned);
                 setUnassignedDevices(unassigned);
                 setSelectedDevices(new Set());
+                setAssignedDeviceSearch('');
+                setUnassignedDeviceSearch('');
                 setShowMdmDetail(true);
             };
 
@@ -378,6 +418,24 @@
                     setSelectedDevices(new Set());
                 } else {
                     setSelectedDevices(new Set(unassignedDevices.map(d => d.id)));
+                }
+            };
+
+            const selectAllFilteredUnassigned = () => {
+                if (selectedDevices.size === filteredUnassignedDevices.length && filteredUnassignedDevices.length > 0) {
+                    // Deselect all filtered devices
+                    const newSelected = new Set(selectedDevices);
+                    filteredUnassignedDevices.forEach(device => {
+                        newSelected.delete(device.id);
+                    });
+                    setSelectedDevices(newSelected);
+                } else {
+                    // Select all filtered devices
+                    const newSelected = new Set(selectedDevices);
+                    filteredUnassignedDevices.forEach(device => {
+                        newSelected.add(device.id);
+                    });
+                    setSelectedDevices(newSelected);
                 }
             };
 
@@ -790,9 +848,24 @@
                                                     Currently managed by this server
                                                 </span>
                                             </h4>
+                                            
+                                            <div className="device-search">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search assigned devices by serial number, model, or device ID..."
+                                                    value={assignedDeviceSearch}
+                                                    onChange={(e) => setAssignedDeviceSearch(e.target.value)}
+                                                />
+                                                {assignedDeviceSearch && (
+                                                    <div className="device-search-results">
+                                                        Showing {filteredAssignedDevices.length} of {assignedToServer.length} assigned devices
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
                                             <div className="device-list">
-                                                {assignedToServer.length > 0 ? (
-                                                    assignedToServer.map(device => (
+                                                {filteredAssignedDevices.length > 0 ? (
+                                                    filteredAssignedDevices.map(device => (
                                                         <div key={device.id} className="device-item">
                                                             <div className="device-item-info">
                                                                 <div className="device-item-name">
@@ -811,6 +884,10 @@
                                                             </div>
                                                         </div>
                                                     ))
+                                                ) : assignedDeviceSearch ? (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No assigned devices match your search criteria.
+                                                    </p>
                                                 ) : (
                                                     <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
                                                         No devices currently assigned to this server.
@@ -826,9 +903,24 @@
                                                     Available for assignment
                                                 </span>
                                             </h4>
+                                            
+                                            <div className="device-search">
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search unassigned devices by serial number, model, or device ID..."
+                                                    value={unassignedDeviceSearch}
+                                                    onChange={(e) => setUnassignedDeviceSearch(e.target.value)}
+                                                />
+                                                {unassignedDeviceSearch && (
+                                                    <div className="device-search-results">
+                                                        Showing {filteredUnassignedDevices.length} of {unassignedDevices.length} unassigned devices
+                                                    </div>
+                                                )}
+                                            </div>
+                                            
                                             <div className="device-list">
-                                                {unassignedDevices.length > 0 ? (
-                                                    unassignedDevices.map(device => (
+                                                {filteredUnassignedDevices.length > 0 ? (
+                                                    filteredUnassignedDevices.map(device => (
                                                         <div 
                                                             key={device.id} 
                                                             className={`device-item ${selectedDevices.has(device.id) ? 'selected' : ''}`}
@@ -859,6 +951,17 @@
                                                             </div>
                                                         </div>
                                                     ))
+                                                ) : unassignedDeviceSearch ? (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices match your search criteria.
+                                                        <br />
+                                                        <button 
+                                                            style={{marginTop: '1rem', background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', textDecoration: 'underline'}}
+                                                            onClick={() => setUnassignedDeviceSearch('')}
+                                                        >
+                                                            Clear search
+                                                        </button>
+                                                    </p>
                                                 ) : (
                                                     <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
                                                         No unassigned devices available.
@@ -866,13 +969,16 @@
                                                 )}
                                             </div>
                                             
-                                            {unassignedDevices.length > 0 && (
+                                            {filteredUnassignedDevices.length > 0 && (
                                                 <div className="bulk-actions">
                                                     <button 
                                                         className="btn btn-secondary"
-                                                        onClick={selectAllUnassigned}
+                                                        onClick={selectAllFilteredUnassigned}
                                                     >
-                                                        {selectedDevices.size === unassignedDevices.length ? 'Deselect All' : 'Select All'}
+                                                        {selectedDevices.size > 0 && 
+                                                         filteredUnassignedDevices.every(device => selectedDevices.has(device.id)) 
+                                                            ? 'Deselect All Filtered' 
+                                                            : 'Select All Filtered'}
                                                     </button>
                                                     <button 
                                                         className="btn assign-btn"
@@ -882,7 +988,8 @@
                                                         Assign Selected ({selectedDevices.size})
                                                     </button>
                                                     <span className="selected-count">
-                                                        {selectedDevices.size} of {unassignedDevices.length} selected
+                                                        {selectedDevices.size} selected
+                                                        {unassignedDeviceSearch && ` (${filteredUnassignedDevices.length} filtered)`}
                                                     </span>
                                                 </div>
                                             )}
