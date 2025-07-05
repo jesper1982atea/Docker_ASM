@@ -402,69 +402,6 @@
                 }
             };
 
-            const fetchDeviceServerAssignments = async () => {
-                // Fetch assigned server info for all assigned devices with rate limiting
-                const assignedDevices = devices.filter(d => d.attributes?.status === 'ASSIGNED');
-                if (assignedDevices.length === 0) {
-                    console.log('No assigned devices found');
-                    return;
-                }
-                
-                const serverMap = new Map();
-                const batchSize = 3; // Reduced batch size to be more conservative
-                const delay = 2000; // Increased delay to 2 seconds between batches
-                
-                console.log(`Fetching server assignments for ${assignedDevices.length} devices in batches of ${batchSize}`);
-                
-                try {
-                    for (let i = 0; i < assignedDevices.length; i += batchSize) {
-                        const batch = assignedDevices.slice(i, i + batchSize);
-                        console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(assignedDevices.length / batchSize)}`);
-                        
-                        const promises = batch.map(async (device) => {
-                            try {
-                                const response = await fetch(`/api/${customerId}/devices/${device.id}/assignedServer`);
-                                if (response.ok) {
-                                    const serverData = await response.json();
-                                    if (serverData.data) {
-                                        serverMap.set(device.id, {
-                                            id: serverData.data.id,
-                                            name: serverData.data.attributes?.serverName || 
-                                                  serverData.data.attributes?.name || 
-                                                  serverData.data.id
-                                        });
-                                    }
-                                } else if (response.status === 404) {
-                                    // Device not assigned to any server, skip silently
-                                    console.log(`Device ${device.id} not assigned to any server`);
-                                } else {
-                                    console.warn(`Failed to fetch server for device ${device.id}: ${response.status}`);
-                                }
-                            } catch (error) {
-                                console.warn(`Could not fetch server for device ${device.id}:`, error);
-                            }
-                        });
-                        
-                        await Promise.all(promises);
-                        
-                        // Update UI with current progress immediately
-                        setDeviceServerMap(new Map(serverMap));
-                        
-                        // Wait before next batch (except for the last batch)
-                        if (i + batchSize < assignedDevices.length) {
-                            console.log(`Waiting ${delay}ms before next batch...`);
-                            await new Promise(resolve => setTimeout(resolve, delay));
-                        }
-                    }
-                    
-                    console.log(`Completed fetching server assignments for ${serverMap.size} devices`);
-                } catch (error) {
-                    console.error('Error in fetchDeviceServerAssignments:', error);
-                    // Even if there's an error, update with whatever we got
-                    setDeviceServerMap(new Map(serverMap));
-                }
-            };
-
             const getAssignedServerName = (device) => {
                 // First check our cached server mapping
                 const serverInfo = deviceServerMap.get(device.id);
@@ -1176,6 +1113,69 @@
                                                     ))
                                                 ) : unassignedDeviceSearch ? (
                                                     <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices match your search criteria.
+                                                        <br />
+                                                        <button 
+                                                            style={{marginTop: '1rem', background: 'none', border: 'none', color: '#667eea', cursor: 'pointer', textDecoration: 'underline'}}
+                                                            onClick={() => setUnassignedDeviceSearch('')}
+                                                        >
+                                                            Clear search
+                                                        </button>
+                                                    </p>
+                                                ) : (
+                                                    <p style={{color: '#6b7280', textAlign: 'center', padding: '2rem'}}>
+                                                        No unassigned devices available.
+                                                    </p>
+                                                )}
+                                            </div>
+                                            
+                                            {filteredUnassignedDevices.length > 0 && (
+                                                <div className="bulk-actions">
+                                                    <button 
+                                                        className="btn btn-secondary"
+                                                        onClick={selectAllFilteredUnassigned}
+                                                    >
+                                                        {selectedDevices.size > 0 && 
+                                                         filteredUnassignedDevices.every(device => selectedDevices.has(device.id)) 
+                                                            ? 'Deselect All Filtered' 
+                                                            : 'Select All Filtered'}
+                                                    </button>
+                                                    <button 
+                                                        className="btn assign-btn"
+                                                        onClick={assignSelectedDevices}
+                                                        disabled={selectedDevices.size === 0}
+                                                    >
+                                                        Assign Selected ({selectedDevices.size})
+                                                    </button>
+                                                    <span className="selected-count">
+                                                        {selectedDevices.size} selected
+                                                        {unassignedDeviceSearch && ` (${filteredUnassignedDevices.length} filtered)`}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div style={{marginTop: '2rem', textAlign: 'center'}}>
+                                        <button 
+                                            className="btn back-btn"
+                                            onClick={() => setShowMdmDetail(false)}
+                                        >
+                                            Back to Device Overview
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<DeviceManagement />, document.getElementById('root'));
+    </script>
+</body>
+</html>
                                                         No unassigned devices match your search criteria.
                                                         <br />
                                                         <button 
