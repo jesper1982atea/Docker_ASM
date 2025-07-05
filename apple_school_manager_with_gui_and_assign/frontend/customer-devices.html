@@ -12,6 +12,17 @@
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; }
         .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 12px; margin-bottom: 2rem; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .header-links { margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .header-link { background: rgba(255,255,255,0.2); color: white; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; transition: background 0.2s; }
+        .header-link:hover { background: rgba(255,255,255,0.3); color: white; }
+        .api-link { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); }
+        .api-link:hover { background: rgba(255,255,255,0.25); }
+        
+        @media (max-width: 600px) {
+            .header-links { flex-direction: column; }
+            .header-link { text-align: center; }
+        }
+        
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
         .stat-card { background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); border-left: 4px solid; }
         .stat-card.assigned { border-left-color: #10b981; }
@@ -548,6 +559,24 @@
                             {customerInfo ? `${customerInfo.name} - ${customerInfo.manager_type === 'business' ? 'Apple Business Manager' : 'Apple School Manager'}` : 'Loading customer info...'}
                         </p>
                         <p>Total Devices: {stats.total}</p>
+                        
+                        <div className="header-links">
+                            <a href={`/swagger/${customerId}`} target="_blank" className="header-link api-link">
+                                📋 Customer API Documentation
+                            </a>
+                            <a href="/docs" target="_blank" className="header-link api-link">
+                                🔧 Full API Documentation
+                            </a>
+                            <a href="/frontend/" className="header-link">
+                                🏠 Back to Admin Panel
+                            </a>
+                            <a href={`/api/${customerId}/devices`} target="_blank" className="header-link api-link">
+                                📱 Raw Devices JSON
+                            </a>
+                            <a href={`/api/${customerId}/mdmServers`} target="_blank" className="header-link api-link">
+                                🖥️ Raw MDM Servers JSON
+                            </a>
+                        </div>
                     </div>
 
                     <div className="stats-grid">

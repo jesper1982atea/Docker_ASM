@@ -112,24 +112,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Function to check token status for a customer
     async function checkTokenStatus(customerId) {
         try {
-            const response = await fetch(`/api/${customerId}/orgs`);
+            const response = await fetch(`/api/${customerId}/token-status`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            });
+            
             const tokenElement = document.getElementById(`token-${customerId}`);
             
             if (response.ok) {
-                tokenElement.textContent = '✓ Token Active';
-                tokenElement.className = 'token-status token-valid';
+                const data = await response.json();
+                if (data.status === 'valid') {
+                    const expiresIn = data.token_expires_in;
+                    if (expiresIn && expiresIn > 0) {
+                        const hours = Math.floor(expiresIn / 3600);
+                        const minutes = Math.floor((expiresIn % 3600) / 60);
+                        tokenElement.textContent = `✓ Token Active (${hours}h ${minutes}m left)`;
+                    } else {
+                        tokenElement.textContent = '✓ Token Active';
+                    }
+                    tokenElement.className = 'token-status token-valid';
+                } else if (data.status === 'rate_limited') {
+                    tokenElement.textContent = '⚠ Rate Limited by Apple';
+                    tokenElement.className = 'token-status token-expired';
+                } else if (data.status === 'configuration_error') {
+                    tokenElement.textContent = '✗ Config Error: ' + data.message;
+                    tokenElement.className = 'token-status token-error';
+                } else {
+                    tokenElement.textContent = '⚠ Token Issue: ' + data.message;
+                    tokenElement.className = 'token-status token-expired';
+                }
             } else if (response.status === 401) {
-                tokenElement.textContent = '⚠ Token Expired';
-                tokenElement.className = 'token-status token-expired';
+                const data = await response.json();
+                tokenElement.textContent = '✗ Token Invalid: ' + (data.message || 'Unauthorized');
+                tokenElement.className = 'token-status token-error';
+            } else if (response.status === 404) {
+                tokenElement.textContent = '✗ Config Error: Check customer setup';
+                tokenElement.className = 'token-status token-error';
             } else {
-                tokenElement.textContent = '✗ Connection Error';
+                tokenElement.textContent = `✗ HTTP ${response.status}`;
                 tokenElement.className = 'token-status token-error';
             }
         } catch (error) {
+            console.error(`Token check failed for customer ${customerId}:`, error);
             const tokenElement = document.getElementById(`token-${customerId}`);
-            tokenElement.textContent = '✗ Network Error';
+            tokenElement.textContent = '✗ Network Error: ' + error.message;
             tokenElement.className = 'token-status token-error';
         }
     }

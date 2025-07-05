@@ -126,6 +126,10 @@ class AppleSchoolManagerAPI:
                 headers = self._auth_headers()
                 url = f"{self.api_url}{endpoint}"
                 
+                # Merge headers if provided in kwargs
+                if 'headers' in kwargs:
+                    headers.update(kwargs.pop('headers'))
+                
                 if method == 'GET':
                     response = requests.get(url, headers=headers, timeout=30, **kwargs)
                 elif method == 'POST':
@@ -140,20 +144,38 @@ class AppleSchoolManagerAPI:
                         self.access_token = None
                         self.token_expiry = 0
                     continue
+                
+                if response.status_code == 429:
+                    logger.warning(f"Rate limited (429), waiting before retry (attempt {attempt + 1})")
+                    time.sleep(60)
+                    continue
                     
                 response.raise_for_status()
                 return response.json()
                 
+            except requests.exceptions.Timeout as e:
+                logger.error(f"Request timeout on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
+            except requests.exceptions.ConnectionError as e:
+                logger.error(f"Connection error on attempt {attempt + 1}: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
             except requests.exceptions.RequestException as e:
                 if attempt < max_retries - 1:
                     logger.warning(f"API request failed (attempt {attempt + 1}), retrying: {e}")
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(2 ** attempt)
                     continue
                 logger.error(f"API request failed after {max_retries} attempts: {e}")
                 raise
 
-    def get_orgs(self):
-        return self._make_api_request("/orgs")
+    # def get_orgs(self):
+    #     # This endpoint doesn't exist in Apple School Manager API
+    #     return self._make_api_request("/orgs")
 
     def get_all_devices(self):
         return self._make_api_request("/orgDevices")
@@ -169,6 +191,14 @@ class AppleSchoolManagerAPI:
         if fields:
             params["fields[mdmServers]"] = ",".join(fields)
         return self._make_api_request("/mdmServers", params=params)
+
+    def test_connection(self):
+        """Test if the API connection works by fetching MDM servers"""
+        try:
+            result = self.get_mdm_servers(limit=1)
+            return {"status": "success", "message": "Connection successful"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
     def get_unassigned_devices(self):
         all_devices = self.get_all_devices()

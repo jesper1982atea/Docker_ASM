@@ -8,6 +8,7 @@ import copy
 import shutil
 import logging
 import time
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -73,9 +74,17 @@ class DeviceAssignedServer(Resource):
 @customer_ns.route('/<string:customer_id>/orgs')
 class Orgs(Resource):
     def get(self, customer_id):
+        """This endpoint might not exist in Apple School Manager API"""
         asm, err, code = get_asm_instance(customer_id)
         if err: return jsonify(err), code
-        return asm.get_orgs()
+        
+        # Since /orgs doesn't seem to exist, let's return MDM servers instead
+        # or create a custom response
+        try:
+            return {"message": "Organizations endpoint not available in Apple School Manager API. Use /mdmServers instead."}
+        except Exception as e:
+            logger.error(f"Error in orgs endpoint for customer {customer_id}: {e}")
+            return {"error": "Organizations endpoint not supported"}, 404
 
 @customer_ns.route('/<string:customer_id>/mdmServers')
 class MdmServers(Resource):
@@ -193,15 +202,48 @@ class TokenStatus(Resource):
                 return {"status": "error", "message": err["error"]}, code
             
             # Try to make a simple API call to test the token
-            result = asm.get_orgs()
+            logger.info(f"Testing token for customer {customer_id}")
+            
+            # Use mdmServers endpoint instead of orgs (which doesn't exist)
+            # This is a lightweight endpoint that should work for both school and business
+            result = asm.get_mdm_servers(limit=1)
+            
+            expires_in = None
+            if asm.token_expiry:
+                expires_in = max(0, asm.token_expiry - int(time.time()))
+            
             return {
                 "status": "valid", 
                 "message": "Token is active",
-                "token_expires_in": max(0, asm.token_expiry - int(time.time())) if asm.token_expiry else None
+                "token_expires_in": expires_in,
+                "last_api_call": "successful"
             }
+            
+        except requests.exceptions.Timeout:
+            logger.error(f"Timeout when testing token for customer {customer_id}")
+            return {"status": "error", "message": "Request timeout"}, 408
+            
+        except requests.exceptions.ConnectionError:
+            logger.error(f"Connection error when testing token for customer {customer_id}")
+            return {"status": "error", "message": "Connection error to Apple API"}, 503
+            
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 401:
+                logger.warning(f"Invalid token for customer {customer_id}")
+                return {"status": "invalid", "message": "Token is expired or invalid"}, 401
+            elif e.response.status_code == 429:
+                logger.warning(f"Rate limited for customer {customer_id}")
+                return {"status": "rate_limited", "message": "Rate limited by Apple"}, 429
+            elif e.response.status_code == 404:
+                logger.error(f"404 error for customer {customer_id} - possibly wrong API endpoint or customer configuration")
+                return {"status": "configuration_error", "message": "API endpoint not found - check customer configuration"}, 404
+            else:
+                logger.error(f"HTTP error {e.response.status_code} for customer {customer_id}")
+                return {"status": "error", "message": f"HTTP {e.response.status_code}"}, 500
+                
         except Exception as e:
             logger.error(f"Token validation failed for customer {customer_id}: {e}")
-            return {"status": "invalid", "message": str(e)}, 401
+            return {"status": "error", "message": str(e)}, 500
 
 api.add_namespace(customer_ns)
 
