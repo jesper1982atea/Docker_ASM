@@ -4,6 +4,9 @@ import requests
 from authlib.jose import jwt
 from Crypto.PublicKey import ECC
 import threading
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AppleSchoolManagerAPI:
     def __init__(self, pem_path, client_id, team_id, key_id, scope="school.api", manager_type="school"):
@@ -25,10 +28,12 @@ class AppleSchoolManagerAPI:
         self.access_token = None
         self.token_expiry = 0
         self._token_lock = threading.Lock()
+        self._last_token_request = 0
+        self._min_token_interval = 60  # Minimum 60 seconds between token requests
 
     def _generate_jwt(self):
         now = int(time.time())
-        exp = now + 86400 * 180
+        exp = now + 86400 * 180  # 180 days expiry for JWT
         headers = {
             "alg": "ES256",
             "kid": self.key_id
@@ -46,24 +51,65 @@ class AppleSchoolManagerAPI:
         return jwt.encode(headers, payload, private_key.export_key(format='PEM')).decode()
 
     def get_access_token(self):
-        # Undvik race conditions vid parallella requests
+        """Get access token with improved caching and rate limiting"""
         with self._token_lock:
-            if self.access_token and time.time() < self.token_expiry - 60:
+            current_time = time.time()
+            
+            # Check if we have a valid token with sufficient buffer time (5 minutes)
+            if (self.access_token and 
+                current_time < self.token_expiry - 300):  # 5 minute buffer
+                logger.debug(f"Using cached token, expires in {self.token_expiry - current_time:.0f} seconds")
                 return self.access_token
-            assertion = self._generate_jwt()
-            data = {
-                "grant_type": "client_credentials",
-                "client_id": self.client_id,
-                "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
-                "client_assertion": assertion,
-                "scope": self.scope
-            }
-            response = requests.post(self.token_url, data=data)
-            response.raise_for_status()
-            json_data = response.json()
-            self.access_token = json_data["access_token"]
-            self.token_expiry = int(time.time()) + json_data.get("expires_in", 3600)
-            return self.access_token
+            
+            # Rate limiting: don't request tokens too frequently
+            time_since_last_request = current_time - self._last_token_request
+            if time_since_last_request < self._min_token_interval:
+                if self.access_token:
+                    # Use existing token even if close to expiry
+                    logger.warning(f"Rate limiting token requests, using existing token")
+                    return self.access_token
+                else:
+                    # Wait if we absolutely need a new token
+                    wait_time = self._min_token_interval - time_since_last_request
+                    logger.warning(f"Rate limiting: waiting {wait_time:.1f} seconds before token request")
+                    time.sleep(wait_time)
+            
+            try:
+                logger.info("Requesting new access token from Apple")
+                self._last_token_request = time.time()
+                
+                assertion = self._generate_jwt()
+                data = {
+                    "grant_type": "client_credentials",
+                    "client_id": self.client_id,
+                    "client_assertion_type": "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+                    "client_assertion": assertion,
+                    "scope": self.scope
+                }
+                
+                response = requests.post(self.token_url, data=data, timeout=30)
+                
+                if response.status_code == 429:
+                    logger.error("Rate limited by Apple. Waiting 60 seconds before retry.")
+                    time.sleep(60)
+                    response = requests.post(self.token_url, data=data, timeout=30)
+                
+                response.raise_for_status()
+                json_data = response.json()
+                
+                self.access_token = json_data["access_token"]
+                expires_in = json_data.get("expires_in", 3600)  # Default 1 hour
+                self.token_expiry = int(time.time()) + expires_in
+                
+                logger.info(f"New token acquired, expires in {expires_in} seconds")
+                return self.access_token
+                
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Failed to get access token: {e}")
+                if self.access_token:
+                    logger.warning("Using existing token despite refresh failure")
+                    return self.access_token
+                raise
 
     def _auth_headers(self):
         return {
@@ -71,39 +117,58 @@ class AppleSchoolManagerAPI:
             "Accept": "application/json"
         }
 
+    def _make_api_request(self, endpoint, method='GET', **kwargs):
+        """Make API request with retry logic for token refresh"""
+        max_retries = 2
+        
+        for attempt in range(max_retries):
+            try:
+                headers = self._auth_headers()
+                url = f"{self.api_url}{endpoint}"
+                
+                if method == 'GET':
+                    response = requests.get(url, headers=headers, timeout=30, **kwargs)
+                elif method == 'POST':
+                    response = requests.post(url, headers=headers, timeout=30, **kwargs)
+                else:
+                    raise ValueError(f"Unsupported method: {method}")
+                
+                if response.status_code == 401 and attempt < max_retries - 1:
+                    logger.warning("Got 401, refreshing token and retrying")
+                    # Force token refresh
+                    with self._token_lock:
+                        self.access_token = None
+                        self.token_expiry = 0
+                    continue
+                    
+                response.raise_for_status()
+                return response.json()
+                
+            except requests.exceptions.RequestException as e:
+                if attempt < max_retries - 1:
+                    logger.warning(f"API request failed (attempt {attempt + 1}), retrying: {e}")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                    continue
+                logger.error(f"API request failed after {max_retries} attempts: {e}")
+                raise
+
     def get_orgs(self):
-        r = requests.get(f"{self.api_url}/orgs", headers=self._auth_headers())
-        r.raise_for_status()
-        return r.json()
+        return self._make_api_request("/orgs")
 
     def get_all_devices(self):
-        r = requests.get(f"{self.api_url}/orgDevices", headers=self._auth_headers())
-        r.raise_for_status()
-        return r.json()
+        return self._make_api_request("/orgDevices")
 
     def get_device_by_id(self, device_id):
-        r = requests.get(f"{self.api_url}/orgDevices/{device_id}", headers=self._auth_headers())
-        r.raise_for_status()
-        return r.json()
+        return self._make_api_request(f"/orgDevices/{device_id}")
 
     def get_assigned_server(self, device_id):
-        r = requests.get(f"{self.api_url}/orgDevices/{device_id}/assignedServer", headers=self._auth_headers())
-        r.raise_for_status()
-        return r.json()
+        return self._make_api_request(f"/orgDevices/{device_id}/assignedServer")
 
     def get_mdm_servers(self, limit=100, fields=None):
-        params = {
-            "limit": str(limit)
-        }
+        params = {"limit": str(limit)}
         if fields:
             params["fields[mdmServers]"] = ",".join(fields)
-        response = requests.get(
-            f"{self.api_url}/mdmServers",
-            headers=self._auth_headers(),
-            params=params
-        )
-        response.raise_for_status()
-        return response.json()
+        return self._make_api_request("/mdmServers", params=params)
 
     def get_unassigned_devices(self):
         all_devices = self.get_all_devices()
@@ -132,19 +197,13 @@ class AppleSchoolManagerAPI:
 
     def create_org_device_activity(self, payload):
         """Create an orgDeviceActivity (e.g., ASSIGN_DEVICES)"""
-        response = requests.post(
-            f"{self.api_url}/orgDeviceActivities",
-            headers={**self._auth_headers(), "Content-Type": "application/json"},
-            json=payload
+        return self._make_api_request(
+            "/orgDeviceActivities", 
+            method='POST',
+            json=payload,
+            headers={"Content-Type": "application/json"}
         )
-        response.raise_for_status()
-        return response.json()
 
     def get_org_device_activity(self, activity_id):
         """Get a specific orgDeviceActivity by ID"""
-        response = requests.get(
-            f"{self.api_url}/orgDeviceActivities/{activity_id}",
-            headers=self._auth_headers()
-        )
-        response.raise_for_status()
-        return response.json()
+        return self._make_api_request(f"/orgDeviceActivities/{activity_id}")

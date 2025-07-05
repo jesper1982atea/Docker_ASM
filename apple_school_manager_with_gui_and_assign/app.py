@@ -6,6 +6,14 @@ import json
 from asmapp.asmapi import AppleSchoolManagerAPI
 import copy
 import shutil
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
@@ -26,10 +34,11 @@ def get_asm_instance(customer_id):
             client_id=meta["client_id"],
             team_id=meta["team_id"],
             key_id=meta["key_id"],
-            manager_type=meta.get("manager_type", "school")  # Default to school for backwards compatibility
+            manager_type=meta.get("manager_type", "school")
         )
         return asm, None, None
     except Exception as e:
+        logger.error(f"Failed to create ASM instance for customer {customer_id}: {e}")
         return None, {"error": str(e)}, 500
 
 # Namespace for customer-specific API
@@ -38,9 +47,13 @@ customer_ns = Namespace('api', description='Kundspecifika endpoints')
 @customer_ns.route('/<string:customer_id>/devices')
 class Devices(Resource):
     def get(self, customer_id):
-        asm, err, code = get_asm_instance(customer_id)
-        if err: return jsonify(err), code
-        return asm.get_all_devices()
+        try:
+            asm, err, code = get_asm_instance(customer_id)
+            if err: return jsonify(err), code
+            return asm.get_all_devices()
+        except Exception as e:
+            logger.error(f"Error fetching devices for customer {customer_id}: {e}")
+            return {"error": "Failed to fetch devices"}, 500
 
 @customer_ns.route('/<string:customer_id>/devices/<string:device_id>')
 class DeviceById(Resource):
