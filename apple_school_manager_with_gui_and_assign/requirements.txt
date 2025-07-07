@@ -4,3 +4,4 @@ authlib
 pycryptodome
 requests
 flask_cors
+pydantic
