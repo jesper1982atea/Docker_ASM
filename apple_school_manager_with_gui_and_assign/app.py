@@ -493,10 +493,26 @@ def swagger_customer(customer_id):
     return send_from_directory(FRONTEND_DIR, "swagger.html")
 
 def generate_customer_swagger_spec(customer_id):
+    # Check if customer has GSX API key
+    has_gsx_key = False
+    meta_path = os.path.join(CUSTOMERS_DIR, customer_id, "meta.json")
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path) as f:
+                meta = json.load(f)
+                if meta.get("gsx_api_key"):
+                    has_gsx_key = True
+        except Exception:
+            pass # Ignore errors here
+
     orig_spec = api.__schema__
     spec = copy.deepcopy(orig_spec)
     new_paths = {}
     for path, path_item in spec["paths"].items():
+        # Conditionally skip GSX endpoints if key is not present
+        if "/gsx/" in path and not has_gsx_key:
+            continue
+
         # Ersätt path-parametern med hårdkodat customer_id
         if "{customer_id}" in path:
             new_path = path.replace("{customer_id}", customer_id)
@@ -525,6 +541,8 @@ def generate_customer_swagger_spec(customer_id):
 
     # Lägg till info om vilken kund det gäller
     spec['info']['description'] += f"\n\nDenna Swagger UI är för kund: {customer_id}"
+    if not has_gsx_key:
+        spec['info']['description'] += "\n\nGSX API endpoints are hidden because no GSX API key is configured for this customer."
     return spec
 
 @app.route("/swagger-spec/<customer_id>.json")
