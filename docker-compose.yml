@@ -5,8 +5,10 @@ services:
     ports:
       - "8080:6000"
     volumes:
-      - .:/app  # Synkroniserar din lokala kod med containern
-      - ./customers:/app/admin_api/customers
+      # Mappa undermappen med koden till /app i containern
+      - ./apple_school_manager_with_gui_and_assign:/app
+      # Se till att customers-mappen fortfarande mappas korrekt
+      - ./apple_school_manager_with_gui_and_assign/customers:/app/admin_api/customers
     environment:
       - PYTHONUNBUFFERED=1
       - FLASK_ENV=development
