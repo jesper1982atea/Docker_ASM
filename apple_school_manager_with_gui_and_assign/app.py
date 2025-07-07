@@ -477,14 +477,6 @@ def generate_customer_swagger_spec(customer_id):
                     if not (p.get("in") == "path" and p.get("name") == "customer_id")
                 ]
             new_paths[new_path] = path_item
-        else:
-            # Ta bort customer_id från root-level parameters även för paths utan {customer_id}
-            if "parameters" in path_item:
-                path_item["parameters"] = [
-                    p for p in path_item["parameters"]
-                    if not (p.get("in") == "path" and p.get("name") == "customer_id")
-                ]
-            new_paths[path] = path_item
     spec["paths"] = new_paths
 
     # Ta även bort customer_id från global parameters om det finns
