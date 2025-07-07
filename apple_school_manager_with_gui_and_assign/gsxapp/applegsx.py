@@ -22,29 +22,29 @@ class AppleGSXAPI:
             response = self.session.get(self.base_url, params=params)
             response.raise_for_status()  # Raise an exception for bad status codes
             
-            data = response.json()
+            # The API returns a string that is a JSON string, including outer quotes.
+            # We need to get the raw text and parse it carefully.
+            raw_text = response.text.strip()
 
-            # Handle cases where the response is a dictionary with a single key
-            # whose value is a JSON string.
-            if isinstance(data, dict) and len(data) == 1:
-                key = next(iter(data))
-                value = data[key]
-                if isinstance(value, str):
-                    try:
-                        # The value is a JSON string, so we parse it.
-                        return {key: json.loads(value)}, 200
-                    except json.JSONDecodeError:
-                        logger.error(f"GSX API returned a dictionary with a malformed JSON string for device {device_id}")
-                        # Fall through to return original data if parsing fails
-            
-            # Handle cases where the entire response is a JSON string.
-            if isinstance(data, str):
-                try:
-                    # If data is a string, it's likely double-encoded JSON.
-                    return json.loads(data), 200
-                except json.JSONDecodeError:
-                    # If it's not valid JSON, return it as is with an error indicator.
-                    logger.error(f"GSX API returned a string that is not valid JSON for device {device_id}")
+            # If the string is quoted, unquote it.
+            if raw_text.startswith('"') and raw_text.endswith('"'):
+                raw_text = raw_text[1:-1]
+
+            # The string inside is escaped, so we can now load it as JSON.
+            try:
+                # The string might have python-style escapes, so we decode it.
+                data = json.loads(raw_text)
+                return data, 200
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse JSON from GSX API for device {device_id}: {e}")
+                return {"error": "Received malformed JSON data from GSX API", "details": response.text}, 500
+
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error calling Apple GSX API for device {device_id}: {e}")
+            return {"error": f"Failed to get device details. Status: {e.response.status_code}", "details": e.response.text}, e.response.status_code
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
+            return {"error": str(e)}, 500
                     return {"error": "Received malformed data from GSX API", "details": data}, 500
             
             return data, 200
