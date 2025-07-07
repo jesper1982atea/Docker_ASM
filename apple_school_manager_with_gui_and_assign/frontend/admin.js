@@ -121,40 +121,40 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   App.init();
-});
-            if (target.classList.contains("delete-btn")) {
-                if (confirm("Är du säker på att du vill ta bort denna kund?")) {
-                    try {
-                        await fetch(`/api/customers/${customerId}`, { method: "DELETE" });
-                        fetchCustomers();
-                    } catch (error) {
-                        console.error("Kunde inte ta bort kund:", error);
-                    }
-                }
-            } else if (target.classList.contains("edit-btn")) {
-                const response = await fetch(`/api/customers/${customerId}`);
-                const customer = await response.json();
+// });
+//             if (target.classList.contains("delete-btn")) {
+//                 if (confirm("Är du säker på att du vill ta bort denna kund?")) {
+//                     try {
+//                         await fetch(`/api/customers/${customerId}`, { method: "DELETE" });
+//                         fetchCustomers();
+//                     } catch (error) {
+//                         console.error("Kunde inte ta bort kund:", error);
+//                     }
+//                 }
+//             } else if (target.classList.contains("edit-btn")) {
+//                 const response = await fetch(`/api/customers/${customerId}`);
+//                 const customer = await response.json();
 
-                document.getElementById('editingCustomerId').value = customer.id;
-                addCustomerForm.name.value = customer.name;
-                addCustomerForm.client_and_team_id.value = customer.client_id; // Use client_id for the combined field
-                addCustomerForm.key_id.value = customer.key_id;
-                addCustomerForm.manager_type.value = customer.manager_type;
+//                 document.getElementById('editingCustomerId').value = customer.id;
+//                 addCustomerForm.name.value = customer.name;
+//                 addCustomerForm.client_and_team_id.value = customer.client_id; // Use client_id for the combined field
+//                 addCustomerForm.key_id.value = customer.key_id;
+//                 addCustomerForm.manager_type.value = customer.manager_type;
 
-                document.getElementById('formTitle').textContent = 'Redigera kund';
-                document.getElementById('submitBtn').textContent = 'Uppdatera';
-                document.getElementById('cancelBtn').style.display = 'inline-block';
-                document.getElementById('pemFile').required = false;
-                document.getElementById('pemNote').textContent = 'Lämna tom för att behålla befintlig PEM-fil.';
-                addCustomerForm.scrollIntoView({ behavior: 'smooth' });
-            }
-        });
+//                 document.getElementById('formTitle').textContent = 'Redigera kund';
+//                 document.getElementById('submitBtn').textContent = 'Uppdatera';
+//                 document.getElementById('cancelBtn').style.display = 'inline-block';
+//                 document.getElementById('pemFile').required = false;
+//                 document.getElementById('pemNote').textContent = 'Lämna tom för att behålla befintlig PEM-fil.';
+//                 addCustomerForm.scrollIntoView({ behavior: 'smooth' });
+//             }
+//         });
 
-        cancelBtn.addEventListener("click", resetForm);
+//         cancelBtn.addEventListener("click", resetForm);
 
-        swaggerLinkContainer.innerHTML = `<a href="/docs" target="_blank">Öppna generell API-dokumentation (Swagger)</a>`;
-        fetchCustomers();
-    };
+//         swaggerLinkContainer.innerHTML = `<a href="/docs" target="_blank">Öppna generell API-dokumentation (Swagger)</a>`;
+//         fetchCustomers();
+//     };
 
-    render();
-});
+//     render();
+// });
