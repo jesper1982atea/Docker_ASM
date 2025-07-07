@@ -92,8 +92,8 @@ document.addEventListener("DOMContentLoaded", () => {
                     fetchCustomers();
                     addCustomerForm.reset();
                 } else {
-                    const error = await response.json();
-                    alert("Kunde inte lägga till kund: " + (error.error || "Okänt fel"));
+                    const errorData = await response.json();
+                    alert("Kunde inte lägga till kund: " + (errorData.error || "Okänt fel"));
                 }
             } catch (error) {
                 console.error("Fel vid tillägg av kund:", error);
