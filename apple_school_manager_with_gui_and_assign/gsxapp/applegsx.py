@@ -15,7 +15,7 @@ class AppleGSXAPI:
         self.session = requests.Session()
         self.session.headers.update({"ApiKey": self.api_key})
 
-    def get_device_details(self, device_id: str) -> Tuple[Union[GSXResponse, dict], int]:
+    def get_device_details(self, device_id):
         params = {"deviceid": device_id}
         try:
             response = self.session.get(self.base_url, params=params)
@@ -24,13 +24,12 @@ class AppleGSXAPI:
             raw_text = response.text
 
             try:
-                # Dubbelt serialiserad JSON-sträng
-                inner_json = json.loads(json.loads(raw_text))
-                parsed = GSXResponse(**inner_json)
+                data = parse_possible_double_json(raw_text)
+                parsed = GSXResponse(**data)  # Pydantic mapping
                 return parsed, 200
             except (json.JSONDecodeError, TypeError, ValueError) as e:
                 logger.error(f"Failed to parse JSON from GSX API for device {device_id}: {e}")
-                logger.error(f"Raw text was: {raw_text}")
+                logger.error(f"Raw text was: {raw_text[:500]}...")
                 return {"error": "Received malformed JSON data from GSX API", "details": raw_text}, 500
 
         except requests.exceptions.HTTPError as e:
