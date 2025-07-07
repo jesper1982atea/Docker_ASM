@@ -6,6 +6,27 @@ from gsxapp.gsxmodel import GSXResponse  # <- Importera modellen
 
 logger = logging.getLogger(__name__)
 
+def clean_and_parse_double_encoded_json(raw_text: str):
+    try:
+        # Ta bort ev. avslutande skräp som t.ex. '\""%'
+        raw_text = raw_text.strip()
+
+        if raw_text.endswith('"%'):
+            raw_text = raw_text[:-2]  # ta bort sista två tecken
+        elif raw_text.endswith('"') and not raw_text.endswith('}"'):
+            raw_text = raw_text[:-1]
+
+        # Avkoda första lagret
+        first = json.loads(raw_text)
+
+        # Om det är en sträng → avkoda igen
+        if isinstance(first, str) and first.strip().startswith("{"):
+            return json.loads(first)
+
+        return first
+    except Exception as e:
+        raise ValueError(f"Could not parse cleaned JSON: {e}")
+
 def parse_double_encoded_json(raw_text: str):
     try:
         # 1. Försök alltid som dubbel-json
@@ -41,7 +62,7 @@ class AppleGSXAPI:
             raw_text = response.text
 
             try:
-                data = parse_double_encoded_json(raw_text)
+                data = clean_and_parse_double_encoded_json(raw_text)
                 parsed = GSXResponse(**data)  # Pydantic
                 return parsed, 200
             except Exception as e:
