@@ -9,6 +9,12 @@ logger = logging.getLogger(__name__)
 
 def parse_gsx_json(raw_text: str):
     try:
+        return json.loads(json.loads(raw_text))
+    except Exception as e:
+        raise ValueError(f"Double-decoding failed: {e}")
+
+def parse_gsx_json(raw_text: str):
+    try:
         # 1. Ta bort skräp som extra suffix efter sista avslutande }
         match = re.search(r'^"({.*})"\s*[%]*$', raw_text.strip())
         if not match:
