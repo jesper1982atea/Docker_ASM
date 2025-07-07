@@ -22,9 +22,22 @@ class AppleGSXAPI:
             response = self.session.get(self.base_url, params=params)
             response.raise_for_status()  # Raise an exception for bad status codes
             
-            # The external API might be returning a JSON string inside a JSON response.
-            # We need to parse it twice.
             data = response.json()
+
+            # Handle cases where the response is a dictionary with a single key
+            # whose value is a JSON string.
+            if isinstance(data, dict) and len(data) == 1:
+                key = next(iter(data))
+                value = data[key]
+                if isinstance(value, str):
+                    try:
+                        # The value is a JSON string, so we parse it.
+                        return {key: json.loads(value)}, 200
+                    except json.JSONDecodeError:
+                        logger.error(f"GSX API returned a dictionary with a malformed JSON string for device {device_id}")
+                        # Fall through to return original data if parsing fails
+            
+            # Handle cases where the entire response is a JSON string.
             if isinstance(data, str):
                 try:
                     # If data is a string, it's likely double-encoded JSON.
