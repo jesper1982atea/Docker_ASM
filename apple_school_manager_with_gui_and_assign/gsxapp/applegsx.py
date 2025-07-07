@@ -25,17 +25,14 @@ class AppleGSXAPI:
             # Replicating the .NET logic to handle the specific string format from Flexvalg API.
             raw_text = response.text
 
-            # The raw text is a string that looks like: "\"{\\\"key\\\": \\\"value\\\"}\""
-            # It's a JSON string, inside a string, inside a response.
-
             # C# logic: jsonFormatted = response.Content.Replace(@"\""", @"""")
-            # This replaces all occurrences of '\"' with '"'.
             json_formatted = raw_text.replace('\\"', '"')
 
-            # C# logic: jsonFormatted = jsonFormatted.Substring(1, jsonFormatted.Length - 2);
-            # This removes the first and last character.
-            # The raw string starts and ends with a quote that needs to be removed.
-            if json_formatted.startswith('"') and json_formatted.endswith('"'):
+            # C# logic: 
+            # jsonFormatted = jsonFormatted.Substring(1, jsonFormatted.Length - 1);
+            # jsonFormatted = jsonFormatted.Substring(0, jsonFormatted.Length - 1);
+            # This is equivalent to removing the first and last character.
+            if len(json_formatted) >= 2:
                  json_formatted = json_formatted[1:-1]
 
             try:
@@ -49,6 +46,9 @@ class AppleGSXAPI:
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error calling Apple GSX API for device {device_id}: {e}")
             return {"error": f"Failed to get device details. Status: {e.response.status_code}", "details": e.response.text}, e.response.status_code
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
+            return {"error": str(e)}, 500
         except requests.exceptions.RequestException as e:
             logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
             return {"error": str(e)}, 500
