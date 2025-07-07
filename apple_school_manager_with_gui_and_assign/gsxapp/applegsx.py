@@ -1,45 +1,29 @@
 import requests
 import logging
 import json
+import re
 from typing import Optional, Tuple, Union
 from gsxapp.gsxmodel import GSXResponse  # <- Importera modellen
 
 logger = logging.getLogger(__name__)
 
-def clean_and_parse_double_encoded_json(raw_text: str):
+def parse_gsx_json(raw_text: str):
     try:
-        # Ta bort ev. avslutande skräp som t.ex. '\""%'
-        raw_text = raw_text.strip()
+        # 1. Ta bort skräp som extra suffix efter sista avslutande }
+        match = re.search(r'^"({.*})"\s*[%]*$', raw_text.strip())
+        if not match:
+            raise ValueError("Regex did not match double-encoded JSON")
 
-        if raw_text.endswith('"%'):
-            raw_text = raw_text[:-2]  # ta bort sista två tecken
-        elif raw_text.endswith('"') and not raw_text.endswith('}"'):
-            raw_text = raw_text[:-1]
+        cleaned_outer = match.group(1)
 
-        # Avkoda första lagret
-        first = json.loads(raw_text)
+        # 2. Unescape inner JSON string
+        inner_json = json.loads(cleaned_outer)
 
-        # Om det är en sträng → avkoda igen
-        if isinstance(first, str) and first.strip().startswith("{"):
-            return json.loads(first)
+        # 3. Nu är inner_json en sträng som innehåller riktig JSON
+        return json.loads(inner_json)
 
-        return first
     except Exception as e:
-        raise ValueError(f"Could not parse cleaned JSON: {e}")
-
-def parse_double_encoded_json(raw_text: str):
-    try:
-        # 1. Försök alltid som dubbel-json
-        first_pass = json.loads(raw_text)
-
-        # Kontroll: är det en string som börjar med { ?
-        if isinstance(first_pass, str) and first_pass.strip().startswith("{"):
-            return json.loads(first_pass)
-
-        # Om det redan är en dict (eller list) – returnera
-        return first_pass
-    except Exception as e:
-        raise ValueError("Could not parse JSON, even double-decoded") from e
+        raise ValueError(f"Could not parse cleaned GSX JSON: {e}")
         
 
 class AppleGSXAPI:
@@ -62,7 +46,7 @@ class AppleGSXAPI:
             raw_text = response.text
 
             try:
-                data = clean_and_parse_double_encoded_json(raw_text)
+                data = parse_gsx_json(raw_text)
                 parsed = GSXResponse(**data)  # Pydantic
                 return parsed, 200
             except Exception as e:
