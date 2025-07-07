@@ -14,6 +14,19 @@ class AppleGSXAPI:
         self.api_key = api_key
         self.session = requests.Session()
         self.session.headers.update({"ApiKey": self.api_key})
+    
+    def parse_possible_double_json(raw_text: str):
+        try:
+            # Försök först tolka som dubbel JSON
+            intermediate = json.loads(raw_text)
+            if isinstance(intermediate, str):
+                # Det var en sträng igen => dubbel-JSON
+                return json.loads(intermediate)
+            else:
+                # Det var redan en dict eller lista => enkel JSON
+                return intermediate
+        except json.JSONDecodeError:
+            raise ValueError("Could not parse JSON, even once.")
 
     def get_device_details(self, device_id):
         params = {"deviceid": device_id}
