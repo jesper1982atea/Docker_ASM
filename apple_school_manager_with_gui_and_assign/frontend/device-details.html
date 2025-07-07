@@ -44,6 +44,7 @@
 
         function DeviceDetailsPage() {
             const [device, setDevice] = useState(null);
+            const [gsxDetails, setGsxDetails] = useState(null);
             const [mdmServers, setMdmServers] = useState([]);
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
@@ -87,6 +88,22 @@
 
                     setDevice(deviceData);
                     setMdmServers(mdmServersData.data || []);
+
+                    // Fetch GSX details if possible
+                    try {
+                        const gsxRes = await fetch(`/api/${customerId}/gsx/device-details/${deviceId}`);
+                        if (gsxRes.ok) {
+                            const gsxData = await gsxRes.json();
+                            if (gsxData.device) {
+                                setGsxDetails(gsxData.device);
+                            }
+                        } else {
+                            console.log("GSX details not available or API key not configured.");
+                        }
+                    } catch (e) {
+                        console.warn("Could not fetch GSX details:", e);
+                    }
+
                 } catch (err) {
                     setError(err.message);
                 } finally {
@@ -182,6 +199,38 @@
                         <div className="detail-item"><div className="detail-label">Purchase Source</div><div className="detail-value">{attributes.purchaseSourceType}</div></div>
                         <div className="detail-item"><div className="detail-label">Device ID</div><div className="detail-value">{device.data.id}</div></div>
                     </div>
+
+                    {gsxDetails && (
+                        <div className="management-section">
+                            <h3>GSX Information</h3>
+                            <div className="detail-grid">
+                                <div className="detail-item">
+                                    <div className="detail-label">Product Description</div>
+                                    <div className="detail-value">{gsxDetails.productDescription}</div>
+                                </div>
+                                <div className="detail-item">
+                                    <div className="detail-label">Warranty Status</div>
+                                    <div className="detail-value" style={{ color: gsxDetails.warrantyInfo?.warrantyStatusCode !== 'OO' ? 'green' : 'red' }}>
+                                        {gsxDetails.warrantyInfo?.warrantyStatusDescription}
+                                    </div>
+                                </div>
+                                <div className="detail-item">
+                                    <div className="detail-label">Purchase Date</div>
+                                    <div className="detail-value">{new Date(gsxDetails.warrantyInfo?.purchaseDate).toLocaleDateString()}</div>
+                                </div>
+                                <div className="detail-item">
+                                    <div className="detail-label">Sold To</div>
+                                    <div className="detail-value">{gsxDetails.soldToName}</div>
+                                </div>
+                                {gsxDetails.productImageURL && (
+                                    <div className="detail-item">
+                                        <div className="detail-label">Image</div>
+                                        <img src={gsxDetails.productImageURL} alt="Product Image" style={{ maxWidth: '72px', borderRadius: '4px' }} />
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="management-section">
                         <h3>Device Assignment</h3>
