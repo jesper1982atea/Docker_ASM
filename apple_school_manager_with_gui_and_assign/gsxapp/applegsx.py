@@ -7,17 +7,20 @@ from gsxapp.gsxmodel import GSXResponse  # <- Importera modellen
 logger = logging.getLogger(__name__)
 
 def parse_possible_double_json(raw_text: str):
-        try:
-            # Försök först tolka som dubbel JSON
-            intermediate = json.loads(raw_text)
-            if isinstance(intermediate, str):
-                # Det var en sträng igen => dubbel-JSON
-                return json.loads(intermediate)
-            else:
-                # Det var redan en dict eller lista => enkel JSON
-                return intermediate
-        except json.JSONDecodeError:
-            raise ValueError("Could not parse JSON, even once.")
+    try:
+        # 1: Försök parsa yttersta lagret
+        first = json.loads(raw_text)
+
+        # 2: Om det vi fick tillbaka är en sträng (och börjar med { eller [), försök parsa igen
+        if isinstance(first, str) and first.strip().startswith(("{", "[")):
+            return json.loads(first)
+        
+        # Annars är vi klara
+        return first
+
+    except json.JSONDecodeError as e:
+        raise ValueError("Could not parse JSON, even once.") from e
+        
 
 class AppleGSXAPI:
     def __init__(self, api_key: str):
