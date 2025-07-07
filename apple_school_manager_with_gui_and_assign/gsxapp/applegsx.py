@@ -45,7 +45,7 @@ class AppleGSXAPI:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
             return {"error": str(e)}, 500
-                    return {"error": "Received malformed data from GSX API", "details": data}, 500
+            return {"error": "Received malformed data from GSX API", "details": data}, 500
             
             return data, 200
         except requests.exceptions.HTTPError as e:
