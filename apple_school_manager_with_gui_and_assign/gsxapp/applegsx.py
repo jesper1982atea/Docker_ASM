@@ -6,16 +6,7 @@ from gsxapp.gsxmodel import GSXResponse  # <- Importera modellen
 
 logger = logging.getLogger(__name__)
 
-class AppleGSXAPI:
-    def __init__(self, api_key: str):
-        if not api_key:
-            raise ValueError("Apple GSX API Key must be provided.")
-        self.base_url = "https://api.flexvalg.dk/internalApi/v1/services/593/AppleGSX"
-        self.api_key = api_key
-        self.session = requests.Session()
-        self.session.headers.update({"ApiKey": self.api_key})
-    
-    def parse_possible_double_json(raw_text: str):
+def parse_possible_double_json(raw_text: str):
         try:
             # Försök först tolka som dubbel JSON
             intermediate = json.loads(raw_text)
@@ -27,6 +18,17 @@ class AppleGSXAPI:
                 return intermediate
         except json.JSONDecodeError:
             raise ValueError("Could not parse JSON, even once.")
+
+class AppleGSXAPI:
+    def __init__(self, api_key: str):
+        if not api_key:
+            raise ValueError("Apple GSX API Key must be provided.")
+        self.base_url = "https://api.flexvalg.dk/internalApi/v1/services/593/AppleGSX"
+        self.api_key = api_key
+        self.session = requests.Session()
+        self.session.headers.update({"ApiKey": self.api_key})
+    
+    
 
     def get_device_details(self, device_id):
         params = {"deviceid": device_id}
@@ -51,3 +53,5 @@ class AppleGSXAPI:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
             return {"error": str(e)}, 500
+        
+    
