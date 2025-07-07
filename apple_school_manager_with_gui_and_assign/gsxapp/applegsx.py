@@ -2,7 +2,7 @@ import requests
 import logging
 import json
 from typing import Optional, Tuple, Union
-from gsxmodel import GSXResponse  # <- Importera modellen
+from gsxapp.gsxmodel import GSXResponse  # <- Importera modellen
 
 logger = logging.getLogger(__name__)
 
