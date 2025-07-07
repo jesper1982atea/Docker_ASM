@@ -4,6 +4,7 @@ from flask_cors import CORS
 import os
 import json
 from asmapp.asmapi import AppleSchoolManagerAPI
+from gsxapp.applegsx import AppleGSXAPI
 import copy
 import shutil
 import logging
@@ -61,6 +62,32 @@ def get_asm_instance(customer_id):
 
 # Namespace for customer-specific API
 customer_ns = Namespace('api', description='Kundspecifika endpoints')
+
+@customer_ns.route('/<string:customer_id>/gsx/device-details/<string:device_id>')
+class GsxDeviceDetails(Resource):
+    def get(self, customer_id, device_id):
+        """Get device details from GSX API"""
+        path = os.path.join(CUSTOMERS_DIR, customer_id)
+        if not os.path.exists(path):
+            return {"error": "Customer not found"}, 404
+        try:
+            with open(os.path.join(path, "meta.json")) as f:
+                meta = json.load(f)
+            
+            gsx_api_key = meta.get("gsx_api_key")
+            if not gsx_api_key:
+                return {"error": "GSX API key not configured for this customer"}, 400
+
+            gsx_api = AppleGSXAPI(api_key=gsx_api_key)
+            data, status_code = gsx_api.get_device_details(device_id)
+            return data, status_code
+
+        except ValueError as e:
+            logger.error(f"GSX API configuration error for customer {customer_id}: {e}")
+            return {"error": str(e)}, 400
+        except Exception as e:
+            logger.error(f"Error fetching GSX details for device {device_id} for customer {customer_id}: {e}")
+            return {"error": "Failed to fetch GSX device details"}, 500
 
 @customer_ns.route('/<string:customer_id>/devices')
 class Devices(Resource):
@@ -310,6 +337,7 @@ class Customers(Resource):
         team_id = request.form.get("team_id")
         key_id = request.form.get("key_id")
         manager_type = request.form.get("manager_type", "school")  # school or business
+        gsx_api_key = request.form.get("gsx_api_key") # New field
         pem_file = request.files.get("pem")
 
         # Om bara en av client_id eller team_id är angiven, använd samma värde för båda
@@ -332,13 +360,16 @@ class Customers(Resource):
         pem_file.save(pem_path)
 
         with open(os.path.join(customer_path, "meta.json"), "w") as f:
-            json.dump({
+            json_data = {
                 "name": name,
                 "client_id": client_id,
                 "team_id": team_id,
                 "key_id": key_id,
                 "manager_type": manager_type
-            }, f)
+            }
+            if gsx_api_key:
+                json_data["gsx_api_key"] = gsx_api_key
+            json.dump(json_data, f)
 
         return {"status": "added", "id": customer_id}, 201
 
@@ -377,6 +408,7 @@ class CustomerEdit(Resource):
             team_id = request.form.get("team_id")
             key_id = request.form.get("key_id")
             manager_type = request.form.get("manager_type")
+            gsx_api_key = request.form.get("gsx_api_key") # New field
             pem_file = request.files.get("pem")
             
             if name:
@@ -389,6 +421,11 @@ class CustomerEdit(Resource):
                 existing_data["key_id"] = key_id
             if manager_type and manager_type in ["school", "business"]:
                 existing_data["manager_type"] = manager_type
+            if gsx_api_key:
+                existing_data["gsx_api_key"] = gsx_api_key
+            else:
+                # Allow removing the key
+                existing_data.pop("gsx_api_key", None)
             
             # Uppdatera PEM-fil om en ny laddas upp
             if pem_file:

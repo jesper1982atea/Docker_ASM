@@ -20,7 +20,7 @@ class AppleGSXAPI:
         try:
             response = self.session.get(self.base_url, params=params)
             response.raise_for_status()  # Raise an exception for bad status codes
-            return response.json()
+            return response.json(), 200
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error calling Apple GSX API for device {device_id}: {e}")
             return {"error": f"Failed to get device details. Status: {e.response.status_code}", "details": e.response.text}, e.response.status_code
