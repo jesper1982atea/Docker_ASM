@@ -523,8 +523,21 @@ class OrgDeviceActivitiesUnassign(Resource):
         device_ids = data.get("device_ids")
         if not device_ids or not isinstance(device_ids, list):
             return {"error": "device_ids (list) required"}, 400
-        result = asm.unassign_devices(device_ids=device_ids)
-        return result, 201
+        try:
+            result = asm.unassign_devices(device_ids=device_ids)
+            return result, 201
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code == 409:
+                # Försök att extrahera felmeddelande från Apple API
+                try:
+                    error_detail = e.response.json()
+                except Exception:
+                    error_detail = e.response.text
+                return {
+                    "error": "Conflict: Device is already being processed or already unassigned.",
+                    "detail": error_detail
+                }, 409
+            raise
 
 if __name__ == "__main__":
     # Use environment variables for Docker compatibility
