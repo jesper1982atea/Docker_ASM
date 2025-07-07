@@ -93,7 +93,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 ${c.gsx_api_key ? '<br><small style="color: green;">GSX API Nyckel konfigurerad</small>' : ''}
               </div>
               <div class="customer-actions">
-                <a href="/customer/${c.id}/devices" class="swagger-link">Enheter</a>
+                <a href="/frontend/customer-devices.html?customer=${c.id}" class="swagger-link">Enheter</a>
                 <a href="/swagger/${c.id}" target="_blank" class="swagger-link">API Docs</a>
                 <button class="edit-btn" data-id="${c.id}">Redigera</button>
                 <button class="delete-btn" data-id="${c.id}">Ta bort</button>
