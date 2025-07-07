@@ -1,126 +1,126 @@
-document.addEventListener('DOMContentLoaded', function() {
-    const root = document.getElementById('root');
-    const swaggerLinkDiv = document.getElementById('swagger-link');
-    
-    // Create the form HTML
-    root.innerHTML = `
-        <section>
-            <form id="customerForm">
-                <h2 id="formTitle">Lägg till ny kund</h2>
-                <input type="hidden" id="editingCustomerId" />
-                <input name="name" placeholder="Kundnamn" required />
-                <select name="manager_type" required>
-                    <option value="">Välj typ av manager</option>
-                    <option value="school">Apple School Manager</option>
-                    <option value="business">Apple Business Manager</option>
+document.addEventListener("DOMContentLoaded", () => {
+    const root = document.getElementById("root");
+    const swaggerLinkContainer = document.getElementById("swagger-link");
+
+    const render = () => {
+        root.innerHTML = `
+            <form id="addCustomerForm">
+                <h2>Lägg till ny kund</h2>
+                <input type="text" name="name" placeholder="Kundnamn" required />
+                <input type="text" name="client_and_team_id" placeholder="Client/Team ID" required />
+                <input type="text" name="key_id" placeholder="Key ID" required />
+                <input type="file" name="pem" required />
+                <select name="manager_type">
+                    <option value="school">School Manager</option>
+                    <option value="business">Business Manager</option>
                 </select>
-                <input name="client_id" placeholder="Client ID" required />
-                <input name="team_id" placeholder="Team ID" required />
-                <input name="key_id" placeholder="Key ID" required />
-                <input type="file" name="pem" accept=".pem" id="pemFile" />
-                <small id="pemNote" style="flex-basis: 100%; color: #666;">PEM-fil krävs för nya kunder</small>
-                <button type="submit" id="submitBtn">Lägg till kund</button>
-                <button type="button" id="cancelBtn" style="display: none; background: #666;" onclick="cancelEdit()">Avbryt</button>
+                <button type="submit">Lägg till</button>
             </form>
-        </section>
-        <section>
-            <h2>Befintliga kunder</h2>
             <ul id="customerList"></ul>
-        </section>
-    `;
+        `;
 
-    const form = document.getElementById('customerForm');
-    const customerList = document.getElementById('customerList');
+        const customerList = document.getElementById("customerList");
+        const addCustomerForm = document.getElementById("addCustomerForm");
 
-    form.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const formData = new FormData(form);
-        const editingId = document.getElementById('editingCustomerId').value;
-        
-        try {
-            let url = '/api/customers';
-            let method = 'POST';
-            
-            if (editingId) {
-                url = `/api/customers/${editingId}`;
-                method = 'PUT';
+        const fetchCustomers = async () => {
+            try {
+                const response = await fetch("/api/customers");
+                const customers = await response.json();
+                customerList.innerHTML = "";
+                customers.forEach(customer => {
+                    const li = document.createElement("li");
+                    li.innerHTML = `
+                        <div class="customer-info">
+                            <b>${customer.name}</b> (Typ: ${customer.manager_type || 'school'})
+                            <div class="token-status" id="status-${customer.id}">Kontrollerar status...</div>
+                        </div>
+                        <div class="customer-actions">
+                            <a href="/customer/${customer.id}/devices" class="swagger-link">Hantera enheter</a>
+                            <a href="/swagger/${customer.id}" class="swagger-link" target="_blank">API</a>
+                            <button class="delete-btn" data-id="${customer.id}">Ta bort</button>
+                        </div>
+                    `;
+                    customerList.appendChild(li);
+                    checkTokenStatus(customer.id);
+                });
+            } catch (error) {
+                console.error("Kunde inte hämta kunder:", error);
+                customerList.innerHTML = "<li>Kunde inte ladda kundlistan.</li>";
             }
-            
-            const response = await fetch(url, {
-                method: method,
-                body: formData
-            });
-            
-            if (response.ok) {
-                form.reset();
-                cancelEdit();
-                loadCustomers();
-                alert(editingId ? 'Kund uppdaterad!' : 'Kund tillagd!');
-            } else {
-                const error = await response.json();
-                alert('Fel: ' + (error.error || 'Okänt fel'));
-            }
-        } catch (error) {
-            alert('Fel vid ' + (editingId ? 'uppdatering' : 'uppladdning') + ': ' + error.message);
-        }
-    });
+        };
 
-    async function loadCustomers() {
-        try {
-            const response = await fetch('/api/customers');
-            const customers = await response.json();
-            
-            customerList.innerHTML = customers.map(customer => `
-                <li>
-                    <div>
-                        <b>${customer.name}</b> 
-                        <span style="color: #666;">(${customer.manager_type === 'business' ? 'Apple Business Manager' : 'Apple School Manager'})</span>
-                        <br>
-                        <small>ID: ${customer.id}</small>
-                        <br>
-                        <span id="token-${customer.id}" class="token-status">Checking token...</span>
-                    </div>
-                    <div class="customer-actions">
-                        <button class="edit-btn" onclick="editCustomer('${customer.id}')">
-                            Redigera
-                        </button>
-                        <a href="/customer/${customer.id}/devices?customer=${customer.id}" class="swagger-link" target="_blank">
-                            View Devices
-                        </a>
-                        <a href="/swagger/${customer.id}" class="swagger-link" target="_blank">
-                            Swagger UI
-                        </a>
-                        <button class="delete-btn" onclick="deleteCustomer('${customer.id}')">
-                            Ta bort
-                        </button>
-                    </div>
-                </li>
-            `).join('');
-            
-            // Update global swagger link
-            swaggerLinkDiv.innerHTML = `
-                <strong>API-dokumentation:</strong>
-                <a href="/docs" target="_blank">Swagger UI (Alla endpoints)</a>
-            `;
-            
-            // Load token status for each customer
-            customers.forEach(customer => {
-                checkTokenStatus(customer.id);
-            });
-        } catch (error) {
-            console.error('Fel vid laddning av kunder:', error);
-        }
-    }
-
-    // Function to check token status for a customer
-    async function checkTokenStatus(customerId) {
-        try {
-            const response = await fetch(`/api/${customerId}/token-status`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json'
+        const checkTokenStatus = async (customerId) => {
+            const statusEl = document.getElementById(`status-${customerId}`);
+            try {
+                const response = await fetch(`/api/${customerId}/token-status`);
+                const data = await response.json();
+                statusEl.textContent = data.message;
+                statusEl.className = 'token-status'; // Reset classes
+                if (data.status === 'valid') {
+                    statusEl.classList.add('token-valid');
+                } else if (data.status === 'invalid') {
+                    statusEl.classList.add('token-expired');
+                } else {
+                    statusEl.classList.add('token-error');
                 }
-            });
+            } catch (error) {
+                statusEl.textContent = "Fel vid statuskontroll";
+                statusEl.className = 'token-status token-error';
+            }
+        };
+
+        addCustomerForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(addCustomerForm);
+            
+            // Hämta värdet från det kombinerade fältet
+            const clientAndTeamId = formData.get('client_and_team_id');
+            
+            // Sätt både client_id och team_id till samma värde
+            formData.append('client_id', clientAndTeamId);
+            formData.append('team_id', clientAndTeamId);
+            
+            // Ta bort det kombinerade fältet så det inte skickas med
+            formData.delete('client_and_team_id');
+
+            try {
+                const response = await fetch("/api/customers", {
+                    method: "POST",
+                    body: formData,
+                });
+                if (response.ok) {
+                    fetchCustomers();
+                    addCustomerForm.reset();
+                } else {
+                    const error = await response.json();
+                    alert("Kunde inte lägga till kund: " + (error.error || "Okänt fel"));
+                }
+            } catch (error) {
+                console.error("Fel vid tillägg av kund:", error);
+                alert("Ett nätverksfel uppstod.");
+            }
+        });
+
+        customerList.addEventListener("click", async (e) => {
+            if (e.target.classList.contains("delete-btn")) {
+                const customerId = e.target.dataset.id;
+                if (confirm("Är du säker på att du vill ta bort denna kund?")) {
+                    try {
+                        await fetch(`/api/customers/${customerId}`, { method: "DELETE" });
+                        fetchCustomers();
+                    } catch (error) {
+                        console.error("Kunde inte ta bort kund:", error);
+                    }
+                }
+            }
+        });
+
+        swaggerLinkContainer.innerHTML = `<a href="/docs" target="_blank">Öppna generell API-dokumentation (Swagger)</a>`;
+        fetchCustomers();
+    };
+
+    render();
+});
             
             const tokenElement = document.getElementById(`token-${customerId}`);
             
