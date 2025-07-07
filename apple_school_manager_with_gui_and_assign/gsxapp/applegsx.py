@@ -1,7 +1,6 @@
 import requests
 import logging
 import json
-import codecs
 
 logger = logging.getLogger(__name__)
 
@@ -14,37 +13,38 @@ class AppleGSXAPI:
         self.session = requests.Session()
         self.session.headers.update({"ApiKey": self.api_key})
 
-    # def get_device_details(self, device_id):
-    #     """
-    #     Get device details from Apple GSX API.
-    #     """
-    #     params = {"deviceid": device_id}
-    #     try:
-    #         response = self.session.get(self.base_url, params=params)
-    #         response.raise_for_status()  # Raise an exception for bad status codes
+    def get_device_details(self, device_id):
+        """
+        Get device details from Apple GSX API.
+        """
+        params = {"deviceid": device_id}
+        try:
+            response = self.session.get(self.base_url, params=params)
+            response.raise_for_status()
             
-    #         # The API returns a heavily escaped string.
-    #         raw_text = response.text
+            raw_text = response.text
 
-    #         # The string is doubly quoted and escaped.
-    #         # Example: "\"{\\\"key\\\": \\\"value\\\"}\""
-    #         try:
-    #             # First, load it as a JSON string, which will unescape the outer layer.
-    #             # This should turn the example into: "{\"key\": \"value\"}"
-    #             unwrapped_string = json.loads(raw_text)
+            # The API returns a doubly-encoded JSON string.
+            # Example: "\"{\\\"key\\\": \\\"value\\\"}\""
+            try:
+                # First json.loads() unwraps the outer string and un-escapes the content.
+                # This turns the example into: "{\"key\": \"value\"}"
+                unwrapped_string = json.loads(raw_text)
                 
-    #             # Now, the result is a standard JSON string, which we can load.
-    #             data = json.loads(unwrapped_string)
-    #             return data, 200
-    #         except (json.JSONDecodeError, TypeError) as e:
-    #             logger.error(f"Failed to parse JSON from GSX API for device {device_id}: {e}")
-    #             logger.error(f"Raw text was: {raw_text}")
-    #             return {"error": "Received malformed JSON data from GSX API", "details": response.text}, 500
+                # The second json.loads() parses the resulting JSON string into a Python dict.
+                data = json.loads(unwrapped_string)
+                return data, 200
+            except (json.JSONDecodeError, TypeError) as e:
+                logger.error(f"Failed to parse JSON from GSX API for device {device_id}: {e}")
+                logger.error(f"Raw text was: {raw_text}")
+                return {"error": "Received malformed JSON data from GSX API", "details": raw_text}, 500
 
-    #     except requests.exceptions.HTTPError as e:
-    #         logger.error(f"HTTP error calling Apple GSX API for device {device_id}: {e}")
-    #         return {"error": f"Failed to get device details. Status: {e.response.status_code}", "details": e.response.text}, e.response.status_code
-    #     except requests.exceptions.RequestException as e:
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"HTTP error calling Apple GSX API for device {device_id}: {e}")
+            return {"error": f"Failed to get device details. Status: {e.response.status_code}", "details": e.response.text}, e.response.status_code
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
+            return {"error": str(e)}, 500
     #         logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
     #         return {"error": str(e)}, 500
     #         logger.error(f"Error calling Apple GSX API for device {device_id}: {e}")
