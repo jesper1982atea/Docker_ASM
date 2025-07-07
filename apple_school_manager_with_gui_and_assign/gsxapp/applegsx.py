@@ -6,20 +6,19 @@ from gsxapp.gsxmodel import GSXResponse  # <- Importera modellen
 
 logger = logging.getLogger(__name__)
 
-def parse_possible_double_json(raw_text: str):
+def parse_double_encoded_json(raw_text: str):
     try:
-        # 1: Försök parsa yttersta lagret
-        first = json.loads(raw_text)
+        # 1. Försök alltid som dubbel-json
+        first_pass = json.loads(raw_text)
 
-        # 2: Om det vi fick tillbaka är en sträng (och börjar med { eller [), försök parsa igen
-        if isinstance(first, str) and first.strip().startswith(("{", "[")):
-            return json.loads(first)
-        
-        # Annars är vi klara
-        return first
+        # Kontroll: är det en string som börjar med { ?
+        if isinstance(first_pass, str) and first_pass.strip().startswith("{"):
+            return json.loads(first_pass)
 
-    except json.JSONDecodeError as e:
-        raise ValueError("Could not parse JSON, even once.") from e
+        # Om det redan är en dict (eller list) – returnera
+        return first_pass
+    except Exception as e:
+        raise ValueError("Could not parse JSON, even double-decoded") from e
         
 
 class AppleGSXAPI:
@@ -42,13 +41,13 @@ class AppleGSXAPI:
             raw_text = response.text
 
             try:
-                data = parse_possible_double_json(raw_text)
-                parsed = GSXResponse(**data)  # Pydantic mapping
+                data = parse_double_encoded_json(raw_text)
+                parsed = GSXResponse(**data)  # Pydantic
                 return parsed, 200
-            except (json.JSONDecodeError, TypeError, ValueError) as e:
+            except Exception as e:
                 logger.error(f"Failed to parse JSON from GSX API for device {device_id}: {e}")
-                logger.error(f"Raw text was: {raw_text[:500]}...")
-                return {"error": "Received malformed JSON data from GSX API", "details": raw_text}, 500
+                logger.error(f"Raw text was: {raw_text[:1000]}")
+                return {"error": "Malformed JSON from GSX", "details": str(e)}, 500
 
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error calling Apple GSX API for device {device_id}: {e}")
