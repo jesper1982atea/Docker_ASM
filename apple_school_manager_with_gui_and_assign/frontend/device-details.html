@@ -94,7 +94,8 @@
                         const gsxRes = await fetch(`/api/${customerId}/gsx/device-details/${deviceId}`);
                         if (gsxRes.ok) {
                             const gsxData = await gsxRes.json();
-                            if (gsxData.device) {
+                            // The API returns {"device": {...}}, so we use gsxData.device
+                            if (gsxData && gsxData.device) {
                                 setGsxDetails(gsxData.device);
                             }
                         } else {
