@@ -312,6 +312,12 @@ class Customers(Resource):
         manager_type = request.form.get("manager_type", "school")  # school or business
         pem_file = request.files.get("pem")
 
+        # Om bara en av client_id eller team_id är angiven, använd samma värde för båda
+        if client_id and not team_id:
+            team_id = client_id
+        if team_id and not client_id:
+            client_id = team_id
+
         if not all([name, client_id, team_id, key_id, pem_file]):
             return {"error": "Missing fields"}, 400
 
