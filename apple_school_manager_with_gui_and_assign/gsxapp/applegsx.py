@@ -1,5 +1,6 @@
 import requests
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,20 @@ class AppleGSXAPI:
         try:
             response = self.session.get(self.base_url, params=params)
             response.raise_for_status()  # Raise an exception for bad status codes
-            return response.json(), 200
+            
+            # The external API might be returning a JSON string inside a JSON response.
+            # We need to parse it twice.
+            data = response.json()
+            if isinstance(data, str):
+                try:
+                    # If data is a string, it's likely double-encoded JSON.
+                    return json.loads(data), 200
+                except json.JSONDecodeError:
+                    # If it's not valid JSON, return it as is with an error indicator.
+                    logger.error(f"GSX API returned a string that is not valid JSON for device {device_id}")
+                    return {"error": "Received malformed data from GSX API", "details": data}, 500
+            
+            return data, 200
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error calling Apple GSX API for device {device_id}: {e}")
             return {"error": f"Failed to get device details. Status: {e.response.status_code}", "details": e.response.text}, e.response.status_code
