@@ -7,6 +7,9 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
@@ -27,7 +30,7 @@
         .header h1 { font-size: 2rem; color: var(--atea-black); font-weight: 700; }
         .header p { color: var(--atea-grey); }
         .header-links { margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; }
-        .header-link { background: var(--atea-light-grey); color: var(--atea-green); padding: 0.5rem 1rem; border-radius: 5px; text-decoration: none; font-size: 0.875rem; font-weight: 600; transition: background 0.2s; }
+        .header-link { background: var(--atea-light-grey); color: var(--atea-green); padding: 0.5rem 1rem; border-radius: 5px; text-decoration: none; font-size: 0.875rem; font-weight: 600; transition: background 0.2s; border: none; cursor: pointer; }
         .header-link:hover { background-color: var(--atea-green-light); color: var(--atea-white); }
         .loading { text-align: center; padding: 4rem; }
         .spinner { border: 4px solid var(--atea-light-grey); border-top: 4px solid var(--atea-green); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
@@ -46,7 +49,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
         function GsxDeviceDetailsPage() {
             const [gsxDetails, setGsxDetails] = useState(null);
@@ -56,6 +59,7 @@
             const params = new URLSearchParams(window.location.search);
             const customerId = params.get('customer');
             const serial = params.get('serial');
+            const pageRef = useRef(null);
 
             useEffect(() => {
                 if (!customerId || !serial) {
@@ -85,6 +89,65 @@
                 fetchDetails();
             }, [customerId, serial]);
 
+            const handleExportExcel = () => {
+                if (!gsxDetails) return;
+
+                const data = [
+                    { Category: 'General Information', Key: 'Product Description', Value: gsxDetails.productDescription },
+                    { Category: 'General Information', Key: 'Configuration', Value: gsxDetails.configDescription },
+                    { Category: 'General Information', Key: 'Sold To', Value: gsxDetails.soldToName },
+                    { Category: 'General Information', Key: 'Purchase Country', Value: `${gsxDetails.warrantyInfo?.purchaseCountryDesc} (${gsxDetails.warrantyInfo?.purchaseCountryCode})` },
+                    { Category: 'General Information', Key: 'Loaner Device', Value: gsxDetails.loaner ? 'Yes' : 'No' },
+                    
+                    { Category: 'Warranty Details', Key: 'Status', Value: gsxDetails.warrantyInfo?.warrantyStatusDescription },
+                    { Category: 'Warranty Details', Key: 'Purchase Date', Value: new Date(gsxDetails.warrantyInfo?.purchaseDate).toLocaleDateString() },
+                    { Category: 'Warranty Details', Key: 'Registration Date', Value: new Date(gsxDetails.warrantyInfo?.registrationDate).toLocaleDateString() },
+                    { Category: 'Warranty Details', Key: 'Days Remaining', Value: gsxDetails.warrantyInfo?.daysRemaining },
+                    
+                    { Category: 'Activation & Carrier', Key: 'First Activation', Value: gsxDetails.activationDetails?.firstActivationDate ? new Date(gsxDetails.activationDetails.firstActivationDate).toLocaleString() : 'N/A' },
+                    { Category: 'Activation & Carrier', Key: 'Unlocked', Value: gsxDetails.activationDetails?.unlocked ? 'Yes' : 'No' },
+                    { Category: 'Activation & Carrier', Key: 'Carrier', Value: gsxDetails.activationDetails?.carrierName || 'N/A' },
+
+                    { Category: 'Product Information', Key: 'Serial Number', Value: gsxDetails.identifiers?.serial || serial },
+                    { Category: 'Product Information', Key: 'IMEI', Value: gsxDetails.identifiers?.imei || 'N/A' },
+                    { Category: 'Product Information', Key: 'IMEI 2', Value: gsxDetails.identifiers?.imei2 || 'N/A' },
+                ];
+
+                (gsxDetails.caseDetails || []).forEach((c, i) => {
+                    data.push({ Category: 'Repair Cases', Key: `Case ${i+1} ID`, Value: c.caseId });
+                    data.push({ Category: 'Repair Cases', Key: `Case ${i+1} Summary`, Value: c.summary });
+                    data.push({ Category: 'Repair Cases', Key: `Case ${i+1} Created`, Value: new Date(c.createdDateTime).toLocaleString() });
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(data);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "Device Details");
+                worksheet["!cols"] = [{wch:25}, {wch:25}, {wch:40}];
+                XLSX.writeFile(workbook, `GSX_Details_${serial}.xlsx`);
+            };
+
+            const handleExportPdf = () => {
+                if (!pageRef.current) return;
+                
+                html2canvas(pageRef.current, { scale: 2 }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const pdf = new jspdf.jsPDF({
+                        orientation: 'p',
+                        unit: 'mm',
+                        format: 'a4'
+                    });
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = pdf.internal.pageSize.getHeight();
+                    const canvasWidth = canvas.width;
+                    const canvasHeight = canvas.height;
+                    const ratio = canvasWidth / canvasHeight;
+                    const height = pdfWidth / ratio;
+
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, height);
+                    pdf.save(`GSX_Details_${serial}.pdf`);
+                });
+            };
+
             if (loading) {
                 return <div className="loading"><div className="spinner"></div><p>Loading GSX device details...</p></div>;
             }
@@ -100,7 +163,7 @@
             const { productDescription, warrantyInfo, soldToName, productImageURL, activationDetails, identifiers, caseDetails, configDescription, configCode, loaner, consumerLawInfo, messages, productLine } = gsxDetails;
 
             return (
-                <div className="container">
+                <div className="container" ref={pageRef}>
                     <div className="header">
                         <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
                             {productImageURL && <img src={productImageURL} alt="Product" style={{height: '60px', borderRadius: '8px'}} />}
@@ -119,6 +182,8 @@
                              <a href="/frontend/" className="header-link">
                                 🏠 Admin Panel
                             </a>
+                            <button onClick={handleExportExcel} className="header-link">Export to Excel</button>
+                            <button onClick={handleExportPdf} className="header-link">Export to PDF</button>
                         </div>
                     </div>
 
