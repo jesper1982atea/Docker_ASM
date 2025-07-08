@@ -133,6 +133,7 @@ body {
     color: var(--atea-grey);
     margin-bottom: 0;
     display: inline;
+    flex-shrink: 0; /* Prevent label from shrinking */
 }
 .detail-value {
     font-weight: 600;
@@ -140,6 +141,7 @@ body {
     word-break: break-word;
     font-size: 0.9rem;
     text-align: right;
+    min-width: 0; /* Allow value to shrink and wrap */
 }
 .message-list {
     list-style: none;
