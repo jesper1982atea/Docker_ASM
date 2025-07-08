@@ -146,29 +146,21 @@ function GsxSearchPage() {
 
     return (
         <div className="container">
-            <div className="header">
+            <div className="header atea-header">
                 <div className="header-content">
-                    <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" className="header-logo" style={{filter: 'brightness(0) invert(1)'}}/>
+                    <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" className="header-logo"/>
                     <div>
                         <h1>GSX Device Search</h1>
-                        <p>Enter one or more serial numbers below to get device details from GSX.</p>
+                        <p>Enter serial numbers to get device details from GSX.</p>
                     </div>
                 </div>
                 <div className="header-links">
                     <a href={`/swagger/${customerId}`} target="_blank" className="header-link api-link">
-                        📋 Customer API Documentation
+                        📋 API Docs
                     </a>
-
                     <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
                         ⬅️ Back to Device List
                     </a>
-
-                    {customerInfo?.gsx_api_key && (
-                        <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
-                            🔍 GSX Search
-                        </a>
-                    )}
-
                      <a href="/frontend/" className="header-link">
                         🏠 Admin Panel
                     </a>
@@ -205,6 +197,14 @@ function GsxSearchPage() {
         </div>
     );
 }
+
+// const root = ReactDOM.createRoot(document.getElementById('root'));
+// root.render(<GsxSearchPage />);
+//                 </div>
+//             )}
+//         </div>
+//     );
+// }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<GsxSearchPage />);

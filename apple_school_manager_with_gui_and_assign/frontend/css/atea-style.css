@@ -38,6 +38,7 @@ body {
     border-radius: 8px;
     margin-bottom: 2rem;
     box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    border-bottom: none;
 }
 .header-content {
     display: flex;
@@ -185,6 +186,11 @@ body {
 .stat-number { font-size: 2rem; font-weight: bold; margin-bottom: 0.5rem; }
 .stat-label { color: var(--atea-grey); font-size: 0.875rem; }
 .filters { background: var(--atea-white); padding: 1.5rem; border-radius: 8px; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+.filter-row { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.btn-filter { background: var(--atea-light-grey); border: 1px solid var(--border-color); color: var(--atea-grey); padding: 0.5rem 1rem; border-radius: 5px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+.btn-filter:hover { background: #e0e0e0; border-color: #ccc; }
+.btn-filter.active { background: var(--atea-green); color: var(--atea-white); border-color: var(--atea-green); }
+.advanced-filters { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); }
 .filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; align-items: end; }
 .filter-group { display: flex; flex-direction: column; }
 .filter-group label { margin-bottom: 0.5rem; font-weight: 600; color: var(--atea-black); }

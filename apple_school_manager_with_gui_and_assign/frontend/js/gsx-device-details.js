@@ -113,12 +113,14 @@ function GsxDeviceDetailsPage() {
 
     return (
         <div className="container" ref={pageRef}>
-            <div className="header">
-                <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                    {productImageURL && <img src={productImageURL} alt="Product" style={{height: '60px', borderRadius: '8px'}} />}
-                    <div>
-                        <h1>{productDescription}</h1>
-                        <p>Serial Number: {serial}</p>
+            <div className="header atea-header">
+                <div className="header-content" style={{alignItems: 'flex-start'}}>
+                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                        {productImageURL && <img src={productImageURL} alt="Product" style={{height: '60px', borderRadius: '8px', background: 'white', padding: '4px'}} />}
+                        <div>
+                            <h1>{productDescription}</h1>
+                            <p>Serial Number: {serial}</p>
+                        </div>
                     </div>
                 </div>
                 <div className="header-links">

@@ -150,9 +150,9 @@ function DeviceDetailsPage() {
 
     return (
         <div className="container">
-            <div className="header">
+            <div className="header atea-header">
                 <div className="header-content">
-                    <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" className="header-logo" style={{filter: 'brightness(0) invert(1)'}}/>
+                    <img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo"/>
                     <div>
                         <h1>{attributes.deviceModel || 'Device Details'}</h1>
                         <p>Serial Number: {attributes.serialNumber || 'N/A'}</p>

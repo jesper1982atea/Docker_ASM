@@ -336,36 +336,26 @@ function DeviceManagement() {
         <div className="container">
             <div className="header atea-header">
                 <div className="header-content">
-                    <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" className="header-logo"/>
+                    <img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo"/>
                     <div>
                         <h1>Device Management</h1>
                         <p>
                             {customerInfo ? `${customerInfo.name} - ${customerInfo.manager_type === 'business' ? 'Apple Business Manager' : 'Apple School Manager'}` : 'Loading customer info...'}
                         </p>
-                        <p>Total Devices: {stats.total}</p>
                     </div>
                 </div>
                 
                 <div className="header-links">
                     <a href={`/swagger/${customerId}`} target="_blank" className="header-link api-link">
-                        📋 Customer API Documentation
+                        📋 API Docs
                     </a>
                     {customerInfo?.gsx_api_key && (
                         <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
                             🔍 GSX Search
                         </a>
                     )}
-                    <a href="/docs" target="_blank" className="header-link api-link">
-                        🔧 Full API Documentation
-                    </a>
                     <a href="/frontend/" className="header-link">
-                        🏠 Back to Admin Panel
-                    </a>
-                    <a href={`/api/${customerId}/devices`} target="_blank" className="header-link api-link">
-                        📱 Raw Devices JSON
-                    </a>
-                    <a href={`/api/${customerId}/mdmServers`} target="_blank" className="header-link api-link">
-                        🖥️ Raw MDM Servers JSON
+                        🏠 Admin Panel
                     </a>
                 </div>
             </div>
@@ -436,12 +426,12 @@ function DeviceManagement() {
 
             <div className="filters">
                 <div className="filter-row">
-                    <button className="btn btn-filter" onClick={() => quickFilter('reset')}>Show All</button>
-                    <button className={`btn btn-filter ${filters.status === 'unassigned' ? 'active' : ''}`} 
+                    <button className={`btn-filter ${filters.status === 'all' && filters.purchaseSource === 'all' ? 'active' : ''}`} onClick={() => quickFilter('reset')}>Show All</button>
+                    <button className={`btn-filter ${filters.status === 'unassigned' ? 'active' : ''}`} 
                             onClick={() => quickFilter('unassigned')}>Unassigned Only</button>
-                    <button className={`btn btn-filter ${filters.status === 'assigned' ? 'active' : ''}`} 
+                    <button className={`btn-filter ${filters.status === 'assigned' ? 'active' : ''}`} 
                             onClick={() => quickFilter('assigned')}>Assigned Only</button>
-                    <button className="btn btn-filter" 
+                    <button className="btn-filter" 
                             onClick={() => setAdvancedFilters(prev => ({...prev, showAdvanced: !prev.showAdvanced}))}>
                         {advancedFilters.showAdvanced ? 'Hide' : 'Show'} Advanced Filters
                     </button>
@@ -463,7 +453,7 @@ function DeviceManagement() {
                             value={filters.status} 
                             onChange={(e) => handleFilterChange('status', e.target.value)}
                         >
-                            <option value="all">All Status</option>
+                            <option value="all">All Statuses</option>
                             <option value="assigned">Assigned</option>
                             <option value="unassigned">Unassigned</option>
                         </select>
@@ -753,6 +743,16 @@ function DeviceManagement() {
         </div>
     );
 }
+
+// const root = ReactDOM.createRoot(document.getElementById('root'));
+// root.render(<DeviceManagement />);
+//                         </div>
+//                     </div>
+//                 </div>
+//             )}
+//         </div>
+//     );
+// }
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<DeviceManagement />);
