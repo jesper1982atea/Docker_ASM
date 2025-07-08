@@ -220,9 +220,25 @@
                                     <div className="detail-value">{new Date(gsxDetails.warrantyInfo?.purchaseDate).toLocaleDateString()}</div>
                                 </div>
                                 <div className="detail-item">
+                                    <div className="detail-label">First Activation</div>
+                                    <div className="detail-value">{gsxDetails.activationDetails?.firstActivationDate ? new Date(gsxDetails.activationDetails.firstActivationDate).toLocaleDateString() : 'N/A'}</div>
+                                </div>
+                                <div className="detail-item">
                                     <div className="detail-label">Sold To</div>
                                     <div className="detail-value">{gsxDetails.soldToName}</div>
                                 </div>
+                                <div className="detail-item">
+                                    <div className="detail-label">Unlocked</div>
+                                    <div className="detail-value" style={{ color: gsxDetails.activationDetails?.unlocked ? 'green' : 'orange' }}>
+                                        {gsxDetails.activationDetails?.unlocked ? 'Yes' : 'No'}
+                                    </div>
+                                </div>
+                                {gsxDetails.identifiers?.imei && (
+                                    <div className="detail-item">
+                                        <div className="detail-label">IMEI</div>
+                                        <div className="detail-value">{gsxDetails.identifiers.imei}</div>
+                                    </div>
+                                )}
                                 {gsxDetails.productImageURL && (
                                     <div className="detail-item">
                                         <div className="detail-label">Image</div>
@@ -230,6 +246,20 @@
                                     </div>
                                 )}
                             </div>
+                            {gsxDetails.caseDetails && gsxDetails.caseDetails.length > 0 && (
+                                <div style={{marginTop: '1.5rem'}}>
+                                    <h4>Repair Cases</h4>
+                                    <div className="detail-grid">
+                                        {gsxDetails.caseDetails.map(caseItem => (
+                                            <div key={caseItem.caseId} className="detail-item">
+                                                <div className="detail-label">Case ID: {caseItem.caseId}</div>
+                                                <div className="detail-value">{caseItem.summary}</div>
+                                                <small style={{color: '#6b7280'}}>{new Date(caseItem.createdDateTime).toLocaleString()}</small>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
