@@ -9,21 +9,19 @@ function GsxDetailsView({ gsxDetails, serial }) {
     return (
         <React.Fragment>
             <div className="section">
+                {productImageURL && 
+                    <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
+                        <img src={productImageURL} alt="Produktbild" style={{
+                            height: '80px', 
+                            width: '80px',
+                            borderRadius: '50%', 
+                            objectFit: 'cover',
+                            border: '2px solid var(--border-color)',
+                        }} />
+                    </div>
+                }
                 <h3>General Information</h3>
                 <div className="detail-grid">
-                    {productImageURL && 
-                        <div className="detail-item" style={{ alignItems: 'center', justifyContent: 'center' }}>
-                            <div className="detail-label" style={{ textAlign: 'center', width: '100%' }}>Produktbild</div>
-                            <img src={productImageURL} alt="Produktbild" style={{
-                                height: '80px', 
-                                width: '80px',
-                                borderRadius: '50%', 
-                                objectFit: 'cover',
-                                border: '2px solid var(--border-color)',
-                                marginTop: '0.5rem'
-                            }} />
-                        </div>
-                    }
                     <div className="detail-item"><div className="detail-label">Configuration</div><div className="detail-value">{configDescription}</div></div>
                     <div className="detail-item"><div className="detail-label">Sold To</div><div className="detail-value">{soldToName}</div></div>
                     <div className="detail-item"><div className="detail-label">Purchase Country</div><div className="detail-value">{warrantyInfo?.purchaseCountryDesc} ({warrantyInfo?.purchaseCountryCode})</div></div>
@@ -259,5 +257,7 @@ function GsxDeviceDetailsPage() {
     );
 }
 
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<GsxDeviceDetailsPage />);
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<GsxDeviceDetailsPage />);
