@@ -259,5 +259,4 @@ function GsxDeviceDetailsPage() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<GsxDeviceDetailsPage />);
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<GsxDeviceDetailsPage />);
+
