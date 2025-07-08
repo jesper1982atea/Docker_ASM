@@ -46,10 +46,10 @@ class AppleGSXAPI:
                 cleaned_json_str = clear_json(response.text)
 
                 # 3. Ladda det som en riktig dict
-                #data = json.loads(cleaned_json_str)
+                data = json.loads(cleaned_json_str)
 
                 # 4. Mappa till pydantic-modellen
-                parsed = cleaned_json_str
+                parsed = GSXResponse(**data)
                 return parsed, 200
 
             except Exception as e:
