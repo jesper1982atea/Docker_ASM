@@ -590,3 +590,12 @@ class OrgDeviceActivitiesUnassign(Resource):
                     "detail": error_detail
                 }, 409
             raise
+
+# Run the app
+if __name__ == "__main__":
+    # Ensure the customers directory exists
+    if not os.path.exists(CUSTOMERS_DIR):
+        os.makedirs(CUSTOMERS_DIR)
+    
+    # Run on port 6000 to match the expected port from curl
+    app.run(host="0.0.0.0", port=6000, debug=True)
