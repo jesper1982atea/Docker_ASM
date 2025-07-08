@@ -7,26 +7,26 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/frontend/css/atea-style.css">
-    <style>
-      header {
-        background: var(--atea-green);
-        color: var(--atea-white);
-        padding: 1.5rem 2rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-      }
-      header h1 {
-        margin: 0 0 0.5rem 0;
-        font-size: 2rem;
-        font-weight: 700;
-      }
-      header p {
-        margin: 0;
-        font-size: 1.1rem;
-        opacity: 0.95;
-      }
-      main {
-        max-width: 700px;
+  </head>
+  <body>
+    <header class="atea-header">
+      <div class="header-content">
+        <img src="/frontend/images/logo.jpg" alt="Atea Logo" class="header-logo"/>
+        <div>
+            <h1>Apple School Manager – Adminpanel</h1>
+            <p>
+              Hantera flera kunders Apple School Manager-integrationer.<br>
+              Lägg till nya kunder, se befintliga och testa integrationen direkt i Swagger.
+            </p>
+        </div>
+      </div>
+    </header>
+    <main class="container" style="max-width: 900px; margin: 2rem auto; padding: 0; background: transparent; box-shadow: none;">
+      <div id="root"></div>
+    </main>
+    <script src="admin.js"></script>
+  </body>
+</html>
         margin: 0 auto;
         background: var(--atea-white);
         border-radius: 8px;

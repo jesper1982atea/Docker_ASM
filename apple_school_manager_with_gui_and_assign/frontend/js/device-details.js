@@ -173,17 +173,20 @@ function DeviceDetailsPage() {
                 </div>
             </div>
 
-            <div className="detail-grid">
-                <div className="detail-item"><div className="detail-label">Status</div><div className="detail-value">{attributes.status}</div></div>
-                <div className="detail-item"><div className="detail-label">OS</div><div className="detail-value">{attributes.os}</div></div>
-                <div className="detail-item"><div className="detail-label">Color</div><div className="detail-value">{attributes.color || 'N/A'}</div></div>
-                <div className="detail-item"><div className="detail-label">Storage</div><div className="detail-value">{attributes.storage || 'N/A'}</div></div>
-                <div className="detail-item"><div className="detail-label">Purchase Source</div><div className="detail-value">{attributes.purchaseSourceType}</div></div>
-                <div className="detail-item"><div className="detail-label">Device ID</div><div className="detail-value">{device.data.id}</div></div>
+            <div className="section">
+                <h3>Device Information</h3>
+                <div className="detail-grid">
+                    <div className="detail-item"><div className="detail-label">Status</div><div className="detail-value">{attributes.status}</div></div>
+                    <div className="detail-item"><div className="detail-label">OS</div><div className="detail-value">{attributes.os}</div></div>
+                    <div className="detail-item"><div className="detail-label">Color</div><div className="detail-value">{attributes.color || 'N/A'}</div></div>
+                    <div className="detail-item"><div className="detail-label">Storage</div><div className="detail-value">{attributes.storage || 'N/A'}</div></div>
+                    <div className="detail-item"><div className="detail-label">Purchase Source</div><div className="detail-value">{attributes.purchaseSourceType}</div></div>
+                    <div className="detail-item"><div className="detail-label">Device ID</div><div className="detail-value">{device.data.id}</div></div>
+                </div>
             </div>
 
             {gsxDetails && (
-                <div className="management-section">
+                <div className="section">
                     <h3>GSX Information</h3>
                     <div className="detail-grid">
                         <div className="detail-item">
@@ -232,10 +235,10 @@ function DeviceDetailsPage() {
                             <h4>Repair Cases</h4>
                             <div className="detail-grid">
                                 {gsxDetails.caseDetails.map(caseItem => (
-                                    <div key={caseItem.caseId} className="detail-item">
+                                    <div key={caseItem.caseId} className="detail-item" style={{flexDirection: 'column', alignItems: 'flex-start'}}>
                                         <div className="detail-label">Case ID: {caseItem.caseId}</div>
-                                        <div className="detail-value">{caseItem.summary}</div>
-                                        <small style={{color: '#6b7280'}}>{new Date(caseItem.createdDateTime).toLocaleString()}</small>
+                                        <div className="detail-value" style={{textAlign: 'left'}}>{caseItem.summary}</div>
+                                        <small style={{color: '#6b7280', width: '100%', textAlign: 'right'}}>{new Date(caseItem.createdDateTime).toLocaleString()}</small>
                                     </div>
                                 ))}
                             </div>
@@ -244,7 +247,7 @@ function DeviceDetailsPage() {
                 </div>
             )}
 
-            <div className="management-section">
+            <div className="section">
                 <h3>Device Assignment</h3>
                 {attributes.status === 'ASSIGNED' ? (
                     <div>
