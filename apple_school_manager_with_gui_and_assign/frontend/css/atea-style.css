@@ -319,6 +319,21 @@ body {
 #customerList li { background: var(--atea-white); margin-bottom: 0.7rem; padding: 1rem; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-color); }
 #customerList b { color: var(--atea-green); font-weight: 600; }
 .customer-actions { display: flex; gap: 0.7rem; }
+.customer-actions a {
+    background: var(--atea-green);
+    color: var(--atea-white);
+    border: 1px solid var(--atea-green);
+    border-radius: 5px;
+    padding: 0.3rem 0.7rem;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.2s, color 0.2s;
+}
+.customer-actions a:hover {
+    background: var(--atea-green-light);
+    border-color: var(--atea-green-light);
+}
 .action-link { background: var(--atea-green); color: var(--atea-white); border: 1px solid var(--atea-green); border-radius: 5px; padding: 0.3rem 0.7rem; text-decoration: none; font-size: 0.95rem; font-weight: 600; transition: background 0.2s, color 0.2s; }
 .action-link:hover { background: var(--atea-green-light); border-color: var(--atea-green-light); }
 .delete-btn { background: #e53935; color: #fff; border: none; border-radius: 5px; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
@@ -355,6 +370,21 @@ body {
 #customerList li { background: var(--atea-white); margin-bottom: 0.7rem; padding: 1rem; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-color); }
 #customerList b { color: var(--atea-green); font-weight: 600; }
 .customer-actions { display: flex; gap: 0.7rem; }
+.customer-actions a {
+    background: var(--atea-green);
+    color: var(--atea-white);
+    border: 1px solid var(--atea-green);
+    border-radius: 5px;
+    padding: 0.3rem 0.7rem;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: background 0.2s, color 0.2s;
+}
+.customer-actions a:hover {
+    background: var(--atea-green-light);
+    border-color: var(--atea-green-light);
+}
 .action-link { background: var(--atea-green); color: var(--atea-white); border: 1px solid var(--atea-green); border-radius: 5px; padding: 0.3rem 0.7rem; text-decoration: none; font-size: 0.95rem; font-weight: 600; transition: background 0.2s, color 0.2s; }
 .action-link:hover { background: var(--atea-green-light); border-color: var(--atea-green-light); }
 .delete-btn { background: #e53935; color: #fff; border: none; border-radius: 5px; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
