@@ -219,9 +219,20 @@
                         <h1>GSX Device Search</h1>
                         <p>Enter one or more serial numbers below (separated by space, comma, or new line) to get device details from GSX.</p>
                         <div className="header-links">
+                            <a href={`/swagger/${customerId}`} target="_blank" className="header-link api-link">
+                                📋 Customer API Documentation
+                            </a>
+
                             <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
                                 ⬅️ Back to Device List
                             </a>
+
+                            {customerInfo?.gsx_api_key && (
+                                <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
+                                    🔍 GSX Search
+                                </a>
+                            )}
+
                              <a href="/frontend/" className="header-link">
                                 🏠 Admin Panel
                             </a>
