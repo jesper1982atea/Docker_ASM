@@ -41,18 +41,18 @@ class AppleGSXAPI:
             try:
                 # 1. Dubbel-avkoda JSON-strängen (API returnerar serialiserad JSON)
                 inner_json_str = json.loads(raw_text)
-                logger.debug(f"Inner JSON string for device {device_id}: {inner_json_str}")
+                #logger.debug(f"Inner JSON string for device {device_id}: {inner_json_str}")
 
                 # 2. Rensa upp stränginnehållet från tomma fält osv
                 cleaned_json_str = clear_json(response.text)
-                logger.debug(f"Cleaned JSON string for device {device_id}: {cleaned_json_str}")
+                #logger.debug(f"Cleaned JSON string for device {device_id}: {cleaned_json_str}")
 
                 # 3. Ladda det som en riktig dict
                 data = json.loads(cleaned_json_str)
-                logger.debug(f"Parsed data for device {device_id}: {data}")
+                #logger.debug(f"Parsed data for device {device_id}: {data}")
 
                 # 4. Mappa till pydantic-modellen
-                parsed = GSXResponse(**data)
+                parsed = data
                 return parsed, 200
 
             except Exception as e:
