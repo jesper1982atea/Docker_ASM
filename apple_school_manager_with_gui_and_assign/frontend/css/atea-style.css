@@ -120,25 +120,26 @@ body {
 }
 .detail-item {
     background: var(--atea-white);
-    padding: 1rem;
+    padding: 0.75rem 1rem;
     border-radius: 5px;
     border: 1px solid var(--border-color);
     display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
 }
 .detail-label {
     font-size: 0.875rem;
     color: var(--atea-grey);
     margin-bottom: 0;
-    display: block;
+    display: inline;
 }
 .detail-value {
     font-weight: 600;
     color: var(--atea-black);
-    word-break: break-all;
-    font-size: 1rem;
-    text-align: left;
+    word-break: break-word;
+    font-size: 0.9rem;
+    text-align: right;
 }
 .message-list {
     list-style: none;
@@ -237,7 +238,7 @@ body {
 }
 .detail-item { 
     background: var(--atea-white); 
-    padding: 1rem; 
+    padding: 0.75rem 1rem; 
     border-radius: 5px; 
     border: 1px solid var(--border-color); 
 }
@@ -250,7 +251,7 @@ body {
 .detail-value { 
     font-weight: 600; 
     color: var(--atea-black); 
-    word-break: break-all; 
+    word-break: break-word; 
 }
 
 /* GSX Search Specific */
