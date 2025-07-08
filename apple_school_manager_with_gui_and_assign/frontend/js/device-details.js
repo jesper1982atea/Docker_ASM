@@ -186,65 +186,12 @@ function DeviceDetailsPage() {
             </div>
 
             {gsxDetails && (
-                <div className="section">
-                    <h3>GSX Information</h3>
-                    <div className="detail-grid">
-                        <div className="detail-item">
-                            <div className="detail-label">Product Description</div>
-                            <div className="detail-value">{gsxDetails.productDescription}</div>
-                        </div>
-                        <div className="detail-item">
-                            <div className="detail-label">Warranty Status</div>
-                            <div className="detail-value" style={{ color: gsxDetails.warrantyInfo?.warrantyStatusCode !== 'OO' ? 'green' : 'red' }}>
-                                {gsxDetails.warrantyInfo?.warrantyStatusDescription}
-                            </div>
-                        </div>
-                        <div className="detail-item">
-                            <div className="detail-label">Purchase Date</div>
-                            <div className="detail-value">{new Date(gsxDetails.warrantyInfo?.purchaseDate).toLocaleDateString()}</div>
-                        </div>
-                        <div className="detail-item">
-                            <div className="detail-label">First Activation</div>
-                            <div className="detail-value">{gsxDetails.activationDetails?.firstActivationDate ? new Date(gsxDetails.activationDetails.firstActivationDate).toLocaleDateString() : 'N/A'}</div>
-                        </div>
-                        <div className="detail-item">
-                            <div className="detail-label">Sold To</div>
-                            <div className="detail-value">{gsxDetails.soldToName}</div>
-                        </div>
-                        <div className="detail-item">
-                            <div className="detail-label">Unlocked</div>
-                            <div className="detail-value" style={{ color: gsxDetails.activationDetails?.unlocked ? 'green' : 'orange' }}>
-                                {gsxDetails.activationDetails?.unlocked ? 'Yes' : 'No'}
-                            </div>
-                        </div>
-                        {gsxDetails.identifiers?.imei && (
-                            <div className="detail-item">
-                                <div className="detail-label">IMEI</div>
-                                <div className="detail-value">{gsxDetails.identifiers.imei}</div>
-                            </div>
-                        )}
-                        {gsxDetails.productImageURL && (
-                            <div className="detail-item">
-                                <div className="detail-label">Image</div>
-                                <img src={gsxDetails.productImageURL} alt="Product Image" style={{ maxWidth: '72px', borderRadius: '4px' }} />
-                            </div>
-                        )}
+                <React.Fragment>
+                    <div className="section" style={{paddingTop: 0, background: 'transparent'}}>
+                        <h2 style={{color: 'var(--atea-black)', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem'}}>GSX Information</h2>
+                        <window.GsxDetailsView gsxDetails={gsxDetails} serial={attributes.serialNumber} />
                     </div>
-                    {gsxDetails.caseDetails && gsxDetails.caseDetails.length > 0 && (
-                        <div style={{marginTop: '1.5rem'}}>
-                            <h4>Repair Cases</h4>
-                            <div className="detail-grid">
-                                {gsxDetails.caseDetails.map(caseItem => (
-                                    <div key={caseItem.caseId} className="detail-item" style={{flexDirection: 'column', alignItems: 'flex-start'}}>
-                                        <div className="detail-label">Case ID: {caseItem.caseId}</div>
-                                        <div className="detail-value" style={{textAlign: 'left'}}>{caseItem.summary}</div>
-                                        <small style={{color: '#6b7280', width: '100%', textAlign: 'right'}}>{new Date(caseItem.createdDateTime).toLocaleString()}</small>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
+                </React.Fragment>
             )}
 
             <div className="section">
@@ -291,3 +238,4 @@ function DeviceDetailsPage() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<DeviceDetailsPage />);
+
