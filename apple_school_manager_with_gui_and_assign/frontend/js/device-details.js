@@ -185,16 +185,7 @@ function DeviceDetailsPage() {
                 </div>
             </div>
 
-            {gsxDetails && (
-                <React.Fragment>
-                    <div className="section" style={{paddingTop: 0, background: 'transparent'}}>
-                        <h2 style={{color: 'var(--atea-black)', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem'}}>GSX Information</h2>
-                        <window.GsxDetailsView gsxDetails={gsxDetails} serial={attributes.serialNumber} />
-                    </div>
-                </React.Fragment>
-            )}
-
-            <div className="section">
+              <div className="section">
                 <h3>Device Assignment</h3>
                 {attributes.status === 'ASSIGNED' ? (
                     <div>
@@ -228,6 +219,17 @@ function DeviceDetailsPage() {
                     </div>
                 )}
             </div>
+
+            {gsxDetails && (
+                <React.Fragment>
+                    <div className="section" style={{paddingTop: 0, background: 'transparent'}}>
+                        <h2 style={{color: 'var(--atea-black)', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem'}}>GSX Information</h2>
+                        <window.GsxDetailsView gsxDetails={gsxDetails} serial={attributes.serialNumber} />
+                    </div>
+                </React.Fragment>
+            )}
+
+          
             
             <div className="footer-actions">
                 {/* This link is now in the header */}
