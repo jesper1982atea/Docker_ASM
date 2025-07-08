@@ -173,26 +173,56 @@ function DeviceDetailsPage() {
                 </div>
             </div>
 
-            <div className="section">
-                <h3>Device Information</h3>
-                <div className="detail-grid">
-                    <div className="detail-item"><div className="detail-label">Status</div><div className="detail-value">{attributes.status}</div></div>
-                    <div className="detail-item"><div className="detail-label">OS</div><div className="detail-value">{attributes.os}</div></div>
-                    <div className="detail-item"><div className="detail-label">Color</div><div className="detail-value">{attributes.color || 'N/A'}</div></div>
-                    <div className="detail-item"><div className="detail-label">Storage</div><div className="detail-value">{attributes.storage || 'N/A'}</div></div>
-                    <div className="detail-item"><div className="detail-label">Purchase Source</div><div className="detail-value">{attributes.purchaseSourceType}</div></div>
-                    <div className="detail-item"><div className="detail-label">Device ID</div><div className="detail-value">{device.data.id}</div></div>
+            {/* --- Apple School/Business Manager Information --- */}
+            <div className="result-card" style={{borderLeft: '4px solid var(--atea-green)', padding: '1.5rem', background: 'var(--atea-white)', marginBottom: '2rem'}}>
+                <div className="result-header" style={{paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)'}}>
+                    <h3 style={{margin: 0, fontSize: '1.25rem'}}>Apple School Manager Details</h3>
+                </div>
+                <div className="detail-grid" style={{gridTemplateColumns: '1fr', gap: 0}}>
+                    <div className="detail-item" style={{padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)'}}>
+                        <span className="detail-label">Status</span>
+                        <span className="detail-value">{attributes.status}</span>
+                    </div>
+                    <div className="detail-item" style={{padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)'}}>
+                        <span className="detail-label">OS</span>
+                        <span className="detail-value">{attributes.os}</span>
+                    </div>
+                    <div className="detail-item" style={{padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)'}}>
+                        <span className="detail-label">Color</span>
+                        <span className="detail-value">{attributes.color || 'N/A'}</span>
+                    </div>
+                    <div className="detail-item" style={{padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)'}}>
+                        <span className="detail-label">Storage</span>
+                        <span className="detail-value">{attributes.storage || 'N/A'}</span>
+                    </div>
+                    <div className="detail-item" style={{padding: '0.75rem 0', borderBottom: '1px solid var(--border-color)'}}>
+                        <span className="detail-label">Purchase Source</span>
+                        <span className="detail-value">{attributes.purchaseSourceType}</span>
+                    </div>
+                    <div className="detail-item" style={{padding: '0.75rem 0', borderBottom: 'none'}}>
+                        <span className="detail-label">Device ID</span>
+                        <span className="detail-value">{device.data.id}</span>
+                    </div>
                 </div>
             </div>
 
-              <div className="section">
+            {/* --- GSX Information --- */}
+            {gsxDetails && (
+                <React.Fragment>
+                    <h2 style={{color: 'var(--atea-black)', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1rem', fontSize: '1.5rem'}}>GSX Information</h2>
+                    <window.GsxDetailsView gsxDetails={gsxDetails} serial={attributes.serialNumber} />
+                </React.Fragment>
+            )}
+
+            {/* --- Device Assignment --- */}
+            <div className="section">
                 <h3>Device Assignment</h3>
                 {attributes.status === 'ASSIGNED' ? (
                     <div>
                         <p>Currently assigned to:</p>
-                        <div className="detail-item">
-                            <div className="detail-label">MDM Server</div>
-                            <div className="detail-value">{assignedServerInfo?.serverName || assignedServerInfo?.name || assignedServerId || 'Loading...'}</div>
+                        <div className="detail-item" style={{background: 'var(--atea-white)', padding: '1rem', borderRadius: '5px', border: '1px solid var(--border-color)'}}>
+                            <div className="detail-label" style={{textTransform: 'uppercase', fontSize: '0.8rem'}}>MDM Server</div>
+                            <div className="detail-value" style={{fontSize: '1rem'}}>{assignedServerInfo?.serverName || assignedServerInfo?.name || assignedServerId || 'Loading...'}</div>
                         </div>
                         <div className="form-group">
                             <button className="btn btn-danger" onClick={unassignDevice}>Unassign Device</button>
@@ -219,17 +249,6 @@ function DeviceDetailsPage() {
                     </div>
                 )}
             </div>
-
-            {gsxDetails && (
-                <React.Fragment>
-                    <div className="section" style={{paddingTop: 0, background: 'transparent'}}>
-                        <h2 style={{color: 'var(--atea-black)', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem'}}>GSX Information</h2>
-                        <window.GsxDetailsView gsxDetails={gsxDetails} serial={attributes.serialNumber} />
-                    </div>
-                </React.Fragment>
-            )}
-
-          
             
             <div className="footer-actions">
                 {/* This link is now in the header */}
