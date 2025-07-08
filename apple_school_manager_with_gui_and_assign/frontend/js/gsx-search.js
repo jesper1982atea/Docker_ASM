@@ -198,13 +198,7 @@ function GsxSearchPage() {
     );
 }
 
-// const root = ReactDOM.createRoot(document.getElementById('root'));
-// root.render(<GsxSearchPage />);
-//                 </div>
-//             )}
-//         </div>
-//     );
-// }
+
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<GsxSearchPage />);

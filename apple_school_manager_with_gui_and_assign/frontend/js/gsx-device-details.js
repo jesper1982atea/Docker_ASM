@@ -8,24 +8,32 @@ function GsxDetailsView({ gsxDetails, serial }) {
 
     return (
         <React.Fragment>
-            <div className="section">
-                {productImageURL && 
-                    <div style={{ textAlign: 'center', marginBottom: '1rem' }}>
-                        <img src={productImageURL} alt="Produktbild" style={{
-                            height: '80px', 
-                            width: '80px',
-                            borderRadius: '50%', 
-                            objectFit: 'cover',
-                            border: '2px solid var(--border-color)',
-                        }} />
-                    </div>
-                }
-                <h3>General Information</h3>
+            <div className="result-card success" style={{borderLeft: 'none', padding: '1.5rem', background: 'var(--atea-light-grey)'}}>
+                <div className="result-header">
+                    <span>{serial}</span>
+                    {productImageURL && <img src={productImageURL} alt="Product Image" />}
+                </div>
                 <div className="detail-grid">
-                    <div className="detail-item"><div className="detail-label">Configuration</div><div className="detail-value">{configDescription}</div></div>
-                    <div className="detail-item"><div className="detail-label">Sold To</div><div className="detail-value">{soldToName}</div></div>
-                    <div className="detail-item"><div className="detail-label">Purchase Country</div><div className="detail-value">{warrantyInfo?.purchaseCountryDesc} ({warrantyInfo?.purchaseCountryCode})</div></div>
-                    <div className="detail-item"><div className="detail-label">Loaner Device</div><div className="detail-value">{loaner ? 'Yes' : 'No'}</div></div>
+                    <div className="detail-item">
+                        <span className="detail-label">Description</span>
+                        <span className="detail-value">{productDescription}</span>
+                    </div>
+                    <div className="detail-item">
+                        <span className="detail-label">Configuration</span>
+                        <span className="detail-value">{configDescription}</span>
+                    </div>
+                    <div className="detail-item">
+                        <span className="detail-label">Sold To</span>
+                        <span className="detail-value">{soldToName}</span>
+                    </div>
+                    <div className="detail-item">
+                        <span className="detail-label">Purchase Country</span>
+                        <span className="detail-value">{warrantyInfo?.purchaseCountryDesc} ({warrantyInfo?.purchaseCountryCode})</span>
+                    </div>
+                    <div className="detail-item">
+                        <span className="detail-label">Loaner Device</span>
+                        <span className="detail-value">{loaner ? 'Yes' : 'No'}</span>
+                    </div>
                 </div>
             </div>
 
