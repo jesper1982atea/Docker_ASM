@@ -3,14 +3,19 @@
   <head>
     <title>Swagger UI - Kund</title>
     <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/css/atea-style.css">
     <style>
-      body { margin: 0; }
-      #swagger-ui { height: 100vh; }
-      #customer-header { background: #1a73e8; color: #fff; padding: 1rem 2rem; font-size: 1.2rem; }
+      body { margin: 0; font-family: 'Inter', sans-serif; }
     </style>
   </head>
   <body>
-    <div id="customer-header"></div>
+    <div id="customer-header">
+      <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" class="header-logo"/>
+      <span id="customer-name"></span>
+    </div>
     <div id="swagger-ui"></div>
     <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
     <script>
@@ -21,7 +26,7 @@
         const match = window.location.pathname.match(/swagger\/([^\/]+)/);
         if (match) customerId = match[1];
       }
-      document.getElementById('customer-header').textContent = customerId
+      document.getElementById('customer-name').textContent = customerId
         ? "Swagger för kund: " + customerId
         : "Ingen kund vald";
 
@@ -39,4 +44,4 @@
     </script>
   </body>
 </html>
-     
+

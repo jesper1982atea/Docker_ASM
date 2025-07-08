@@ -25,6 +25,7 @@ api = Api(app, title="Apple School Manager API", version="1.0", description="API
 
 CUSTOMERS_DIR = os.path.join(os.path.dirname(__file__), "admin_api", "customers")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
+JS_DIR = os.path.join(FRONTEND_DIR, "js")
 
 # Cache for ASM instances to avoid recreating them
 _asm_instance_cache = {}
@@ -483,6 +484,10 @@ def serve_index_alt():
 def health_check():
     return {"status": "healthy"}, 200
 
+@app.route("/frontend/js/<path:path>")
+def serve_js(path):
+    return send_from_directory(JS_DIR, path, mimetype='application/javascript')
+
 @app.route("/frontend/<path:path>")
 def serve_static(path):
     return send_from_directory(FRONTEND_DIR, path)
@@ -585,10 +590,3 @@ class OrgDeviceActivitiesUnassign(Resource):
                     "detail": error_detail
                 }, 409
             raise
-
-if __name__ == "__main__":
-    # Use environment variables for Docker compatibility
-    host = os.getenv('FLASK_HOST', '0.0.0.0')
-    port = int(os.getenv('FLASK_PORT', 6000))
-    debug = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
-    app.run(host=host, port=port, debug=debug)

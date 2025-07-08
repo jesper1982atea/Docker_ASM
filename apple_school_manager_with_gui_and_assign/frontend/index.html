@@ -6,23 +6,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/frontend/css/atea-style.css">
     <style>
-      :root {
-          --atea-green: #006e44;
-          --atea-green-light: #4abf8a;
-          --atea-grey: #666666;
-          --atea-light-grey: #f5f5f5;
-          --atea-white: #ffffff;
-          --atea-black: #000000;
-          --border-color: #e0e0e0;
-      }
-      body {
-        font-family: 'Inter', sans-serif;
-        background: var(--atea-light-grey);
-        margin: 0;
-        padding: 0;
-        color: var(--atea-grey);
-      }
       header {
         background: var(--atea-green);
         color: var(--atea-white);
@@ -85,24 +70,39 @@
       form button:hover {
         background: var(--atea-green-light);
       }
-      #customerList {
-        list-style: none;
-        padding: 0;
-        margin: 0;
-      }
-      #customerList li {
-        background: var(--atea-white);
-        margin-bottom: 0.7rem;
+      #swagger-link {
+        margin-top: 2rem;
+        background: #e6f0ec;
         padding: 1rem;
         border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        border: 1px solid var(--border-color);
-      }
-      #customerList b {
+        font-size: 1.05rem;
         color: var(--atea-green);
-        font-weight: 600;
+      }
+      @media (max-width: 600px) {
+        main { padding: 1rem; }
+        form { flex-direction: column; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-content">
+        <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" class="header-logo"/>
+        <div>
+            <h1>Apple School Manager – Adminpanel</h1>
+            <p>
+              Hantera flera kunders Apple School Manager-integrationer.<br>
+              Lägg till nya kunder, se befintliga och testa integrationen direkt i Swagger.
+            </p>
+        </div>
+      </div>
+    </header>
+    <main>
+      <div id="root"></div>
+    </main>
+    <script src="admin.js"></script>
+  </body>
+</html>
       }
       .customer-actions {
         display: flex;
