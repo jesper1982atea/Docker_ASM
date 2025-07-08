@@ -27,12 +27,19 @@
         .result-card { background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid; }
         .result-card.success { border-left-color: #10b981; }
         .result-card.error { border-left-color: #ef4444; }
-        .result-header { font-weight: 600; margin-bottom: 1rem; font-family: monospace; }
-        .detail-grid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
-        .detail-item { display: flex; justify-content: space-between; }
-        .detail-label { color: #6b7280; }
-        .detail-value { font-weight: 500; text-align: right; }
+        .result-header { font-weight: 600; margin-bottom: 1rem; font-family: monospace; display: flex; justify-content: space-between; align-items: center; }
+        .result-header img { max-width: 50px; border-radius: 4px; margin-left: 1rem; }
+        .detail-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+        .detail-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #e5e7eb; }
+        .detail-item:last-child { border-bottom: none; }
+        .detail-label { color: #6b7280; font-size: 0.875rem; }
+        .detail-value { font-weight: 500; text-align: right; font-size: 0.875rem; }
         .error-message { color: #b91c1c; }
+        .expand-btn { background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.875rem; margin-top: 1rem; padding: 0.25rem 0; }
+        .expand-btn:hover { text-decoration: underline; }
+        .expanded-details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
+        .expanded-details h4 { margin-bottom: 0.5rem; color: #374151; }
+        .case-item { background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; }
     </style>
 </head>
 <body>
@@ -40,6 +47,117 @@
 
     <script type="text/babel">
         const { useState } = React;
+
+        function ResultCard({ serial, data, ok }) {
+            const [isExpanded, setIsExpanded] = useState(false);
+
+            if (!ok || !data.device) {
+                return (
+                    <div className="result-card error">
+                        <h3 className="result-header">{serial}</h3>
+                        <p className="error-message">{data.error || 'Device not found or error fetching details.'}</p>
+                    </div>
+                );
+            }
+
+            const device = data.device;
+            const { productDescription, warrantyInfo, soldToName, productImageURL, activationDetails, identifiers, caseDetails } = device;
+
+            return (
+                <div className="result-card success">
+                    <div className="result-header">
+                        <span>{serial}</span>
+                        {productImageURL && <img src={productImageURL} alt="Product Image" />}
+                    </div>
+                    <div className="detail-grid">
+                        <div className="detail-item">
+                            <span className="detail-label">Description</span>
+                            <span className="detail-value">{productDescription}</span>
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Warranty</span>
+                            <span className="detail-value" style={{ color: warrantyInfo?.warrantyStatusCode !== 'OO' ? 'green' : 'red' }}>
+                                {warrantyInfo?.warrantyStatusDescription}
+                            </span>
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Purchase Date</span>
+                            <span className="detail-value">{new Date(warrantyInfo?.purchaseDate).toLocaleDateString()}</span>
+                        </div>
+                        <div className="detail-item">
+                            <span className="detail-label">Sold To</span>
+                            <span className="detail-value">{soldToName}</span>
+                        </div>
+                    </div>
+
+                    {isExpanded && (
+                        <div className="expanded-details">
+                            <h4>Activation Details</h4>
+                            <div className="detail-grid">
+                                <div className="detail-item">
+                                    <span className="detail-label">First Activation</span>
+                                    <span className="detail-value">{activationDetails?.firstActivationDate ? new Date(activationDetails.firstActivationDate).toLocaleString() : 'N/A'}</span>
+                                </div>
+                                <div className="detail-item">
+                                    <span className="detail-label">Unlocked</span>
+                                    <span className="detail-value" style={{ color: activationDetails?.unlocked ? 'green' : 'orange' }}>
+                                        {activationDetails?.unlocked ? 'Yes' : 'No'}
+                                    </span>
+                                </div>
+                                {activationDetails?.carrierName && (
+                                    <div className="detail-item">
+                                        <span className="detail-label">Carrier</span>
+                                        <span className="detail-value">{activationDetails.carrierName}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <h4 style={{marginTop: '1rem'}}>Identifiers</h4>
+                            <div className="detail-grid">
+                                {identifiers?.imei && (
+                                    <div className="detail-item">
+                                        <span className="detail-label">IMEI</span>
+                                        <span className="detail-value">{identifiers.imei}</span>
+                                    </div>
+                                )}
+                                {identifiers?.imei2 && (
+                                    <div className="detail-item">
+                                        <span className="detail-label">IMEI 2</span>
+                                        <span className="detail-value">{identifiers.imei2}</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {caseDetails && caseDetails.length > 0 && (
+                                <>
+                                    <h4 style={{marginTop: '1rem'}}>Repair Cases ({caseDetails.length})</h4>
+                                    {caseDetails.map(caseItem => (
+                                        <div key={caseItem.caseId} className="case-item">
+                                            <div className="detail-item">
+                                                <span className="detail-label">Case ID</span>
+                                                <span className="detail-value">{caseItem.caseId}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <span className="detail-label">Summary</span>
+                                                <span className="detail-value">{caseItem.summary}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <span className="detail-label">Created</span>
+                                                <span className="detail-value">{new Date(caseItem.createdDateTime).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    <button className="expand-btn" onClick={() => setIsExpanded(!isExpanded)}>
+                        {isExpanded ? 'Show Less' : 'Show More Details'}
+                    </button>
+                </div>
+            );
+        }
 
         function GsxSearchPage() {
             const [serials, setSerials] = useState('');
@@ -107,31 +225,7 @@
                     {results.length > 0 && (
                         <div className="results-grid">
                             {results.map(({ serial, data, ok }) => (
-                                <div key={serial} className={`result-card ${ok && data.device ? 'success' : 'error'}`}>
-                                    <h3 className="result-header">{serial}</h3>
-                                    {ok && data.device ? (
-                                        <div className="detail-grid">
-                                            <div className="detail-item">
-                                                <span className="detail-label">Description</span>
-                                                <span className="detail-value">{data.device.productDescription}</span>
-                                            </div>
-                                            <div className="detail-item">
-                                                <span className="detail-label">Warranty</span>
-                                                <span className="detail-value">{data.device.warrantyInfo?.warrantyStatusDescription}</span>
-                                            </div>
-                                            <div className="detail-item">
-                                                <span className="detail-label">Purchase Date</span>
-                                                <span className="detail-value">{new Date(data.device.warrantyInfo?.purchaseDate).toLocaleDateString()}</span>
-                                            </div>
-                                            <div className="detail-item">
-                                                <span className="detail-label">Sold To</span>
-                                                <span className="detail-value">{data.device.soldToName}</span>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <p className="error-message">{data.error || 'Device not found or error fetching details.'}</p>
-                                    )}
-                                </div>
+                                <ResultCard key={serial} serial={serial} data={data} ok={ok} />
                             ))}
                         </div>
                     )}
