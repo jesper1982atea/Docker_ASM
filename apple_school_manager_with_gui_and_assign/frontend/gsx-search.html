@@ -14,6 +14,9 @@
         .header { border-bottom: 1px solid #e5e7eb; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
         .header h1 { font-size: 2rem; color: #1f2937; }
         .header p { color: #6b7280; }
+        .header-links { margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .header-link { background: rgba(95, 110, 238, 0.1); color: #5a67d8; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; transition: background 0.2s; }
+        .header-link:hover { background: rgba(95, 110, 238, 0.2); }
         .search-section { display: flex; gap: 1rem; margin-bottom: 2rem; }
         .search-section textarea { flex-grow: 1; padding: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; min-height: 100px; font-family: monospace; }
         .btn { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
@@ -46,7 +49,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
 
         function ResultCard({ serial, data, ok }) {
             const [isExpanded, setIsExpanded] = useState(false);
@@ -164,8 +167,18 @@
             const [results, setResults] = useState([]);
             const [loading, setLoading] = useState(false);
             const [error, setError] = useState(null);
+            const [customerInfo, setCustomerInfo] = useState(null);
 
             const customerId = new URLSearchParams(window.location.search).get('customer');
+
+            useEffect(() => {
+                if (customerId) {
+                    fetch(`/api/customers/${customerId}`)
+                        .then(res => res.json())
+                        .then(data => setCustomerInfo(data))
+                        .catch(err => console.error("Failed to fetch customer info:", err));
+                }
+            }, [customerId]);
 
             const handleSearch = async () => {
                 if (!serials.trim()) {
@@ -205,6 +218,14 @@
                     <div className="header">
                         <h1>GSX Device Search</h1>
                         <p>Enter one or more serial numbers below (separated by space, comma, or new line) to get device details from GSX.</p>
+                        <div className="header-links">
+                            <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
+                                ⬅️ Back to Device List
+                            </a>
+                             <a href="/frontend/" className="header-link">
+                                🏠 Admin Panel
+                            </a>
+                        </div>
                     </div>
 
                     <div className="search-section">
@@ -230,9 +251,7 @@
                         </div>
                     )}
                      <div className="footer-actions" style={{marginTop: '2rem', textAlign: 'center'}}>
-                        <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="btn btn-secondary">
-                            Back to Device List
-                        </a>
+                        {/* This link is now in the header */}
                     </div>
                 </div>
             );

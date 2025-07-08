@@ -14,6 +14,9 @@
         .header { border-bottom: 1px solid #e5e7eb; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
         .header h1 { font-size: 2rem; color: #1f2937; }
         .header p { color: #6b7280; }
+        .header-links { margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .header-link { background: rgba(95, 110, 238, 0.1); color: #5a67d8; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; transition: background 0.2s; }
+        .header-link:hover { background: rgba(95, 110, 238, 0.2); }
         .loading { text-align: center; padding: 4rem; }
         .spinner { border: 4px solid #f3f4f6; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -49,6 +52,7 @@
             const [loading, setLoading] = useState(true);
             const [error, setError] = useState(null);
             const [selectedMdm, setSelectedMdm] = useState('');
+            const [customerInfo, setCustomerInfo] = useState(null);
 
             const params = new URLSearchParams(window.location.search);
             const customerId = params.get('customer');
@@ -63,16 +67,19 @@
                 try {
                     setLoading(true);
                     // Fetch device details and MDM servers in parallel
-                    const [deviceRes, mdmServersRes] = await Promise.all([
+                    const [deviceRes, mdmServersRes, customerInfoRes] = await Promise.all([
                         fetch(`/api/${customerId}/devices/${deviceId}`),
-                        fetch(`/api/${customerId}/mdmServers`)
+                        fetch(`/api/${customerId}/mdmServers`),
+                        fetch(`/api/customers/${customerId}`)
                     ]);
 
                     if (!deviceRes.ok) throw new Error(`Failed to fetch device: ${deviceRes.statusText}`);
                     if (!mdmServersRes.ok) throw new Error(`Failed to fetch MDM servers: ${mdmServersRes.statusText}`);
+                    if (!customerInfoRes.ok) throw new Error(`Failed to fetch customer info: ${customerInfoRes.statusText}`);
 
                     const deviceData = await deviceRes.json();
                     const mdmServersData = await mdmServersRes.json();
+                    const customerInfoData = await customerInfoRes.json();
                     
                     // If device is assigned, fetch the server details
                     if (deviceData.data?.attributes?.status === 'ASSIGNED') {
@@ -88,6 +95,7 @@
 
                     setDevice(deviceData);
                     setMdmServers(mdmServersData.data || []);
+                    setCustomerInfo(customerInfoData);
 
                     // Fetch GSX details if possible
                     try {
@@ -190,6 +198,19 @@
                     <div className="header">
                         <h1>{attributes.deviceModel || 'Device Details'}</h1>
                         <p>Serial Number: {attributes.serialNumber || 'N/A'}</p>
+                        <div className="header-links">
+                            <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
+                                ⬅️ Back to Device List
+                            </a>
+                            {customerInfo?.gsx_api_key && (
+                                <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
+                                    🔍 GSX Search
+                                </a>
+                            )}
+                             <a href="/frontend/" className="header-link">
+                                🏠 Admin Panel
+                            </a>
+                        </div>
                     </div>
 
                     <div className="detail-grid">
@@ -299,9 +320,7 @@
                     </div>
                     
                     <div className="footer-actions">
-                        <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="btn btn-secondary">
-                            Back to Device List
-                        </a>
+                        {/* This link is now in the header */}
                     </div>
                 </div>
             );
