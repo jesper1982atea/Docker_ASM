@@ -114,12 +114,14 @@ function GsxDeviceDetailsPage() {
     return (
         <div className="container" ref={pageRef}>
             <div className="header atea-header">
-                <div className="header-content" style={{alignItems: 'flex-start'}}>
+                <div className="header-content">
                     <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                        {productImageURL && <img src={productImageURL} alt="Product" style={{height: '60px', borderRadius: '8px', background: 'white', padding: '4px'}} />}
+                        <img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{height: '40px'}}/>
                         <div>
-                            <h1>{productDescription}</h1>
-                            <p>Serial Number: {serial}</p>
+                            <h1>GSX Device Details</h1>
+                            <p>
+                                {productDescription} ({serial})
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -141,6 +143,12 @@ function GsxDeviceDetailsPage() {
             <div className="section">
                 <h3>General Information</h3>
                 <div className="detail-grid">
+                    {productImageURL && 
+                        <div className="detail-item">
+                            <div className="detail-label">Product Image</div>
+                            <img src={productImageURL} alt="Product" style={{height: '80px', borderRadius: '8px', background: 'white', padding: '4px', border: '1px solid var(--border-color)'}} />
+                        </div>
+                    }
                     <div className="detail-item"><div className="detail-label">Configuration</div><div className="detail-value">{configDescription}</div></div>
                     <div className="detail-item"><div className="detail-label">Sold To</div><div className="detail-value">{soldToName}</div></div>
                     <div className="detail-item"><div className="detail-label">Purchase Country</div><div className="detail-value">{warrantyInfo?.purchaseCountryDesc} ({warrantyInfo?.purchaseCountryCode})</div></div>
