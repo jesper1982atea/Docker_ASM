@@ -7,14 +7,15 @@ from gsxapp.gsxmodel import GSXResponse  # <- Importera modellen
 
 logger = logging.getLogger(__name__)
 
-def clear_json(data: str) -> str:
-    # Rensa matchningar av: tomma listor, tomma strängar, 0, "0000-00-00", "0000000000", tomma objekt
+def clear_json(json_str: str) -> str:
+    """
+    Removes empty or default values from a JSON-like string, mimicking .NET clearJSON.
+    """
     pattern = r'(\"[^\"]*\"\s*:\s*(\[\]|\{\}|\"\"|0|\"0000-00-00\"|\"0000000000\"),?)'
-    result = data
+    result = json_str
     while re.search(pattern, result):
         result = re.sub(pattern, '', result)
 
-    # Städa bort överflödiga kommatecken
     result = result.replace(',}', '}').replace(',]', ']')
     return result
         
@@ -39,21 +40,22 @@ class AppleGSXAPI:
             raw_text = response.text
 
             try:
-                # 1. Dubbel-avkoda JSON-strängen (API returnerar serialiserad JSON)
+                # 1. Trimma bort skräp efter sista } ifall det finns
+                last_brace = raw_text.rfind("}")
+                if last_brace != -1:
+                    raw_text = raw_text[:last_brace + 1]
+
+                # 2. Avkoda yttre JSON-strängen (detta är en serialiserad sträng)
                 inner_json_str = json.loads(raw_text)
-                #logger.debug(f"Inner JSON string for device {device_id}: {inner_json_str}")
 
-                # 2. Rensa upp stränginnehållet från tomma fält osv
-                cleaned_json_str = clear_json(response.text)
-                #logger.debug(f"Cleaned JSON string for device {device_id}: {cleaned_json_str}")
+                # 3. Rensa skräpfält
+                cleaned_json_str = clear_json(inner_json_str)
 
-                # 3. Ladda det som en riktig dict
-                data = json.loads(cleaned_json_str)
-                #logger.debug(f"Parsed data for device {device_id}: {data}")
+                # 4. Konvertera till Python dict
+                cleaned_data = json.loads(cleaned_json_str)
 
-                # 4. Mappa till pydantic-modellen
-                parsed = data
-                return parsed, 200
+                # 5. Returnera direkt – utan Pydantic
+                return cleaned_data, 200
 
             except Exception as e:
                 logger.error(f"Failed to parse JSON from GSX API for device {device_id}: {e}")
