@@ -51,3 +51,4 @@ logs/
 .env
 .env.local
 .env.production
+/apple_school_manager_with_gui_and_assign/gsxapp/parsejson.py
