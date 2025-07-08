@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSX Device Details</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #374151; }
+        .container { max-width: 900px; margin: 2rem auto; padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .header { border-bottom: 1px solid #e5e7eb; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
+        .header h1 { font-size: 2rem; color: #1f2937; }
+        .header p { color: #6b7280; }
+        .header-links { margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .header-link { background: rgba(95, 110, 238, 0.1); color: #5a67d8; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; transition: background 0.2s; }
+        .header-link:hover { background: rgba(95, 110, 238, 0.2); }
+        .loading { text-align: center; padding: 4rem; }
+        .spinner { border: 4px solid #f3f4f6; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .section { background: #f9fafb; padding: 1.5rem; border-radius: 8px; margin-top: 2rem; }
+        .section h3 { margin-bottom: 1rem; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; }
+        .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; }
+        .detail-item { background: white; padding: 1rem; border-radius: 8px; border: 1px solid #e5e7eb; }
+        .detail-label { font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem; }
+        .detail-value { font-weight: 500; color: #1f2937; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        function GsxDeviceDetailsPage() {
+            const [gsxDetails, setGsxDetails] = useState(null);
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            const params = new URLSearchParams(window.location.search);
+            const customerId = params.get('customer');
+            const serial = params.get('serial');
+
+            useEffect(() => {
+                if (!customerId || !serial) {
+                    setError("Customer ID or Serial Number is missing from URL.");
+                    setLoading(false);
+                    return;
+                }
+                
+                const fetchDetails = async () => {
+                    try {
+                        setLoading(true);
+                        const res = await fetch(`/api/${customerId}/gsx/device-details/${serial}`);
+                        if (!res.ok) throw new Error(`Failed to fetch GSX details: ${res.statusText}`);
+                        const data = await res.json();
+                        if (data && data.device) {
+                            setGsxDetails(data.device);
+                        } else {
+                            throw new Error("Device not found in GSX response.");
+                        }
+                    } catch (err) {
+                        setError(err.message);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                fetchDetails();
+            }, [customerId, serial]);
+
+            if (loading) {
+                return <div className="loading"><div className="spinner"></div><p>Loading GSX device details...</p></div>;
+            }
+
+            if (error) {
+                return <div className="container"><h1>Error</h1><p>{error}</p></div>;
+            }
+
+            if (!gsxDetails) {
+                return <div className="container"><h1>Error</h1><p>Could not load device details.</p></div>;
+            }
+
+            const { productDescription, warrantyInfo, soldToName, productImageURL, activationDetails, identifiers, caseDetails, configDescription } = gsxDetails;
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                            {productImageURL && <img src={productImageURL} alt="Product" style={{height: '60px', borderRadius: '8px'}} />}
+                            <div>
+                                <h1>{productDescription}</h1>
+                                <p>Serial Number: {serial}</p>
+                            </div>
+                        </div>
+                        <div className="header-links">
+                            <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
+                                ⬅️ Back to GSX Search
+                            </a>
+                            <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
+                                📦 Device List
+                            </a>
+                             <a href="/frontend/" className="header-link">
+                                🏠 Admin Panel
+                            </a>
+                        </div>
+                    </div>
+
+                    <div className="section">
+                        <h3>General Information</h3>
+                        <div className="detail-grid">
+                            <div className="detail-item"><div className="detail-label">Configuration</div><div className="detail-value">{configDescription}</div></div>
+                            <div className="detail-item"><div className="detail-label">Warranty Status</div><div className="detail-value" style={{ color: warrantyInfo?.warrantyStatusCode !== 'OO' ? 'green' : 'red' }}>{warrantyInfo?.warrantyStatusDescription}</div></div>
+                            <div className="detail-item"><div className="detail-label">Purchase Date</div><div className="detail-value">{new Date(warrantyInfo?.purchaseDate).toLocaleDateString()}</div></div>
+                            <div className="detail-item"><div className="detail-label">Sold To</div><div className="detail-value">{soldToName}</div></div>
+                        </div>
+                    </div>
+
+                    {activationDetails && <div className="section">
+                        <h3>Activation & Carrier</h3>
+                        <div className="detail-grid">
+                            <div className="detail-item"><div className="detail-label">First Activation</div><div className="detail-value">{new Date(activationDetails.firstActivationDate).toLocaleString()}</div></div>
+                            <div className="detail-item"><div className="detail-label">Unlocked</div><div className="detail-value" style={{ color: activationDetails.unlocked ? 'green' : 'orange' }}>{activationDetails.unlocked ? 'Yes' : 'No'}</div></div>
+                            <div className="detail-item"><div className="detail-label">Carrier</div><div className="detail-value">{activationDetails.carrierName || 'N/A'}</div></div>
+                            <div className="detail-item"><div className="detail-label">Last Restore</div><div className="detail-value">{new Date(activationDetails.lastRestoreDate).toLocaleString()}</div></div>
+                        </div>
+                    </div>}
+
+                    {identifiers && <div className="section">
+                        <h3>Identifiers</h3>
+                        <div className="detail-grid">
+                            {identifiers.imei && <div className="detail-item"><div className="detail-label">IMEI</div><div className="detail-value">{identifiers.imei}</div></div>}
+                            {identifiers.imei2 && <div className="detail-item"><div className="detail-label">IMEI 2</div><div className="detail-value">{identifiers.imei2}</div></div>}
+                        </div>
+                    </div>}
+
+                    {caseDetails && caseDetails.length > 0 && <div className="section">
+                        <h3>Repair Cases ({caseDetails.length})</h3>
+                        <div className="detail-grid">
+                            {caseDetails.map(c => (
+                                <div key={c.caseId} className="detail-item">
+                                    <div className="detail-label">Case {c.caseId} ({new Date(c.createdDateTime).toLocaleDateString()})</div>
+                                    <div className="detail-value">{c.summary}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>}
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<GsxDeviceDetailsPage />);
+    </script>
+</body>
+</html>

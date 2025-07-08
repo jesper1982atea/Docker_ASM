@@ -31,7 +31,9 @@
         .spinner { border: 4px solid #f3f4f6; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
-        .result-card { background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid; }
+        .result-card-link { text-decoration: none; color: inherit; }
+        .result-card { background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid; transition: transform 0.2s, box-shadow 0.2s; }
+        .result-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
         .result-card.success { border-left-color: #10b981; }
         .result-card.error { border-left-color: #ef4444; }
         .result-header { font-weight: 600; margin-bottom: 1rem; font-family: monospace; display: flex; justify-content: space-between; align-items: center; }
@@ -42,11 +44,6 @@
         .detail-label { color: #6b7280; font-size: 0.875rem; }
         .detail-value { font-weight: 500; text-align: right; font-size: 0.875rem; }
         .error-message { color: #b91c1c; }
-        .expand-btn { background: none; border: none; color: #667eea; cursor: pointer; font-size: 0.875rem; margin-top: 1rem; padding: 0.25rem 0; }
-        .expand-btn:hover { text-decoration: underline; }
-        .expanded-details { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; }
-        .expanded-details h4 { margin-bottom: 0.5rem; color: #374151; }
-        .case-item { background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 0.75rem; margin-bottom: 0.5rem; }
     </style>
 </head>
 <body>
@@ -55,9 +52,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        function ResultCard({ serial, data, ok }) {
-            const [isExpanded, setIsExpanded] = useState(false);
-
+        function ResultCard({ serial, data, ok, customerId }) {
             if (!ok || !data.device) {
                 return (
                     <div className="result-card error">
@@ -68,101 +63,37 @@
             }
 
             const device = data.device;
-            const { productDescription, warrantyInfo, soldToName, productImageURL, activationDetails, identifiers, caseDetails } = device;
+            const { productDescription, warrantyInfo, soldToName, productImageURL } = device;
 
             return (
-                <div className="result-card success">
-                    <div className="result-header">
-                        <span>{serial}</span>
-                        {productImageURL && <img src={productImageURL} alt="Product Image" />}
-                    </div>
-                    <div className="detail-grid">
-                        <div className="detail-item">
-                            <span className="detail-label">Description</span>
-                            <span className="detail-value">{productDescription}</span>
+                <a href={`/frontend/gsx-device-details.html?customer=${customerId}&serial=${serial}`} className="result-card-link">
+                    <div className="result-card success">
+                        <div className="result-header">
+                            <span>{serial}</span>
+                            {productImageURL && <img src={productImageURL} alt="Product Image" />}
                         </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Warranty</span>
-                            <span className="detail-value" style={{ color: warrantyInfo?.warrantyStatusCode !== 'OO' ? 'green' : 'red' }}>
-                                {warrantyInfo?.warrantyStatusDescription}
-                            </span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Purchase Date</span>
-                            <span className="detail-value">{new Date(warrantyInfo?.purchaseDate).toLocaleDateString()}</span>
-                        </div>
-                        <div className="detail-item">
-                            <span className="detail-label">Sold To</span>
-                            <span className="detail-value">{soldToName}</span>
-                        </div>
-                    </div>
-
-                    {isExpanded && (
-                        <div className="expanded-details">
-                            <h4>Activation Details</h4>
-                            <div className="detail-grid">
-                                <div className="detail-item">
-                                    <span className="detail-label">First Activation</span>
-                                    <span className="detail-value">{activationDetails?.firstActivationDate ? new Date(activationDetails.firstActivationDate).toLocaleString() : 'N/A'}</span>
-                                </div>
-                                <div className="detail-item">
-                                    <span className="detail-label">Unlocked</span>
-                                    <span className="detail-value" style={{ color: activationDetails?.unlocked ? 'green' : 'orange' }}>
-                                        {activationDetails?.unlocked ? 'Yes' : 'No'}
-                                    </span>
-                                </div>
-                                {activationDetails?.carrierName && (
-                                    <div className="detail-item">
-                                        <span className="detail-label">Carrier</span>
-                                        <span className="detail-value">{activationDetails.carrierName}</span>
-                                    </div>
-                                )}
+                        <div className="detail-grid">
+                            <div className="detail-item">
+                                <span className="detail-label">Description</span>
+                                <span className="detail-value">{productDescription}</span>
                             </div>
-
-                            <h4 style={{marginTop: '1rem'}}>Identifiers</h4>
-                            <div className="detail-grid">
-                                {identifiers?.imei && (
-                                    <div className="detail-item">
-                                        <span className="detail-label">IMEI</span>
-                                        <span className="detail-value">{identifiers.imei}</span>
-                                    </div>
-                                )}
-                                {identifiers?.imei2 && (
-                                    <div className="detail-item">
-                                        <span className="detail-label">IMEI 2</span>
-                                        <span className="detail-value">{identifiers.imei2}</span>
-                                    </div>
-                                )}
+                            <div className="detail-item">
+                                <span className="detail-label">Warranty</span>
+                                <span className="detail-value" style={{ color: warrantyInfo?.warrantyStatusCode !== 'OO' ? 'green' : 'red' }}>
+                                    {warrantyInfo?.warrantyStatusDescription}
+                                </span>
                             </div>
-
-                            {caseDetails && caseDetails.length > 0 && (
-                                <>
-                                    <h4 style={{marginTop: '1rem'}}>Repair Cases ({caseDetails.length})</h4>
-                                    {caseDetails.map(caseItem => (
-                                        <div key={caseItem.caseId} className="case-item">
-                                            <div className="detail-item">
-                                                <span className="detail-label">Case ID</span>
-                                                <span className="detail-value">{caseItem.caseId}</span>
-                                            </div>
-                                            <div className="detail-item">
-                                                <span className="detail-label">Summary</span>
-                                                <span className="detail-value">{caseItem.summary}</span>
-                                            </div>
-                                            <div className="detail-item">
-                                                <span className="detail-label">Created</span>
-                                                <span className="detail-value">{new Date(caseItem.createdDateTime).toLocaleString()}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </>
-                            )}
+                            <div className="detail-item">
+                                <span className="detail-label">Purchase Date</span>
+                                <span className="detail-value">{new Date(warrantyInfo?.purchaseDate).toLocaleDateString()}</span>
+                            </div>
+                            <div className="detail-item">
+                                <span className="detail-label">Sold To</span>
+                                <span className="detail-value">{soldToName}</span>
+                            </div>
                         </div>
-                    )}
-
-                    <button className="expand-btn" onClick={() => setIsExpanded(!isExpanded)}>
-                        {isExpanded ? 'Show Less' : 'Show More Details'}
-                    </button>
-                </div>
+                    </div>
+                </a>
             );
         }
 
@@ -261,6 +192,75 @@
                 XLSX.writeFile(workbook, `GSX_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
             };
 
+            if (!customerId) {
+                return <div className="container"><h1>Error</h1><p>No customer ID specified in URL.</p></div>;
+            }
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>GSX Device Search</h1>
+                        <p>Enter one or more serial numbers below (separated by space, comma, or new line) to get device details from GSX.</p>
+                        <div className="header-links">
+                            <a href={`/swagger/${customerId}`} target="_blank" className="header-link api-link">
+                                📋 Customer API Documentation
+                            </a>
+
+                            <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
+                                ⬅️ Back to Device List
+                            </a>
+
+                            {customerInfo?.gsx_api_key && (
+                                <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
+                                    🔍 GSX Search
+                                </a>
+                            )}
+
+                             <a href="/frontend/" className="header-link">
+                                🏠 Admin Panel
+                            </a>
+                        </div>
+                    </div>
+
+                    <div className="search-controls">
+                        <textarea 
+                            value={serials}
+                            onChange={e => setSerials(e.target.value)}
+                            placeholder="Enter serial numbers..."
+                        />
+                        <div className="search-buttons">
+                            <button className="btn btn-primary" onClick={handleSearch} disabled={loading}>
+                                {loading ? 'Searching...' : 'Search'}
+                            </button>
+                            <button className="btn btn-secondary" onClick={handleExport} disabled={results.length === 0}>
+                                Export to Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    {loading && (
+                        <div className="loading"><div className="spinner"></div><p>Fetching details...</p></div>
+                    )}
+
+                    {results.length > 0 && (
+                        <div className="results-grid">
+                            {results.map(({ serial, data, ok }) => (
+                                <ResultCard key={serial} serial={serial} data={data} ok={ok} customerId={customerId} />
+                            ))}
+                        </div>
+                    )}
+                     <div className="footer-actions" style={{marginTop: '2rem', textAlign: 'center'}}>
+                        {/* This link is now in the header */}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<GsxSearchPage />);
+    </script>
+</body>
+</html>
             if (!customerId) {
                 return <div className="container"><h1>Error</h1><p>No customer ID specified in URL.</p></div>;
             }
