@@ -7,6 +7,7 @@
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #374151; }
@@ -17,12 +18,15 @@
         .header-links { margin-top: 1rem; display: flex; gap: 1rem; flex-wrap: wrap; }
         .header-link { background: rgba(95, 110, 238, 0.1); color: #5a67d8; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-size: 0.875rem; transition: background 0.2s; }
         .header-link:hover { background: rgba(95, 110, 238, 0.2); }
-        .search-section { display: flex; gap: 1rem; margin-bottom: 2rem; }
-        .search-section textarea { flex-grow: 1; padding: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; min-height: 100px; font-family: monospace; }
-        .btn { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
+        .search-controls { display: flex; gap: 1rem; margin-bottom: 2rem; align-items: flex-start; }
+        .search-controls textarea { flex-grow: 1; padding: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; min-height: 100px; font-family: monospace; }
+        .search-buttons { display: flex; flex-direction: column; gap: 0.5rem; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; text-align: center; }
         .btn-primary { background: #667eea; color: white; }
         .btn-primary:hover { background: #5a67d8; }
         .btn-primary:disabled { background: #a3aed1; cursor: not-allowed; }
+        .btn-secondary { background: #e5e7eb; color: #374151; }
+        .btn-secondary:hover { background: #d1d5db; }
         .loading { text-align: center; padding: 4rem; }
         .spinner { border: 4px solid #f3f4f6; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -209,6 +213,54 @@
                 setLoading(false);
             };
 
+            const handleExport = () => {
+                if (results.length === 0) {
+                    alert("No data to export.");
+                    return;
+                }
+
+                const dataToExport = results.map(({ serial, data, ok }) => {
+                    if (ok && data.device) {
+                        const device = data.device;
+                        const caseSummaries = (device.caseDetails || [])
+                            .map(c => `${c.caseId}: ${c.summary} (${new Date(c.createdDateTime).toLocaleDateString()})`)
+                            .join('; ');
+
+                        return {
+                            'Serial Number': serial,
+                            'Status': 'Found',
+                            'Product Description': device.productDescription,
+                            'Config Description': device.configDescription,
+                            'Warranty Status': device.warrantyInfo?.warrantyStatusDescription,
+                            'Purchase Date': device.warrantyInfo?.purchaseDate ? new Date(device.warrantyInfo.purchaseDate).toLocaleDateString() : 'N/A',
+                            'Sold To': device.soldToName,
+                            'First Activation': device.activationDetails?.firstActivationDate ? new Date(device.activationDetails.firstActivationDate).toLocaleString() : 'N/A',
+                            'Unlocked': device.activationDetails?.unlocked ? 'Yes' : 'No',
+                            'Carrier': device.activationDetails?.carrierName || 'N/A',
+                            'IMEI': device.identifiers?.imei || 'N/A',
+                            'IMEI 2': device.identifiers?.imei2 || 'N/A',
+                            'Repair Cases': caseSummaries || 'None'
+                        };
+                    } else {
+                        return {
+                            'Serial Number': serial,
+                            'Status': 'Error',
+                            'Details': data.error || 'Device not found or error fetching details.'
+                        };
+                    }
+                });
+
+                const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+                const workbook = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(workbook, worksheet, "GSX_Export");
+                
+                // Auto-size columns
+                const max_width = dataToExport.reduce((w, r) => Math.max(w, ...Object.values(r).map(val => String(val).length)), 10);
+                worksheet["!cols"] = Object.keys(dataToExport[0]).map(() => ({ wch: max_width }));
+
+                XLSX.writeFile(workbook, `GSX_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+            };
+
             if (!customerId) {
                 return <div className="container"><h1>Error</h1><p>No customer ID specified in URL.</p></div>;
             }
@@ -239,15 +291,20 @@
                         </div>
                     </div>
 
-                    <div className="search-section">
+                    <div className="search-controls">
                         <textarea 
                             value={serials}
                             onChange={e => setSerials(e.target.value)}
                             placeholder="Enter serial numbers..."
                         />
-                        <button className="btn btn-primary" onClick={handleSearch} disabled={loading}>
-                            {loading ? 'Searching...' : 'Search'}
-                        </button>
+                        <div className="search-buttons">
+                            <button className="btn btn-primary" onClick={handleSearch} disabled={loading}>
+                                {loading ? 'Searching...' : 'Search'}
+                            </button>
+                            <button className="btn btn-secondary" onClick={handleExport} disabled={results.length === 0}>
+                                Export to Excel
+                            </button>
+                        </div>
                     </div>
 
                     {loading && (
