@@ -12,9 +12,16 @@ function GsxDetailsView({ gsxDetails, serial }) {
                 <h3>General Information</h3>
                 <div className="detail-grid">
                     {productImageURL && 
-                        <div className="detail-item">
-                            <div className="detail-label">Product Image</div>
-                            <img src={productImageURL} alt="Product" style={{height: '80px', borderRadius: '8px', background: 'white', padding: '4px', border: '1px solid var(--border-color)'}} />
+                        <div className="detail-item" style={{ alignItems: 'center', justifyContent: 'center' }}>
+                            <div className="detail-label" style={{ textAlign: 'center', width: '100%' }}>Produktbild</div>
+                            <img src={productImageURL} alt="Produktbild" style={{
+                                height: '80px', 
+                                width: '80px',
+                                borderRadius: '50%', 
+                                objectFit: 'cover',
+                                border: '2px solid var(--border-color)',
+                                marginTop: '0.5rem'
+                            }} />
                         </div>
                     }
                     <div className="detail-item"><div className="detail-label">Configuration</div><div className="detail-value">{configDescription}</div></div>
