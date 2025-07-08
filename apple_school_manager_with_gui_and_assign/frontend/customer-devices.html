@@ -485,6 +485,11 @@
                             <a href={`/swagger/${customerId}`} target="_blank" className="header-link api-link">
                                 📋 Customer API Documentation
                             </a>
+                            {customerInfo?.gsx_api_key && (
+                                <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
+                                    🔍 GSX Search
+                                </a>
+                            )}
                             <a href="/docs" target="_blank" className="header-link api-link">
                                 🔧 Full API Documentation
                             </a>

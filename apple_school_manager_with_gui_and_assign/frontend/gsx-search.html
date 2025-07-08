@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSX Device Search</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f7fa; color: #374151; }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 2rem; background: white; border-radius: 12px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+        .header { border-bottom: 1px solid #e5e7eb; padding-bottom: 1.5rem; margin-bottom: 1.5rem; }
+        .header h1 { font-size: 2rem; color: #1f2937; }
+        .header p { color: #6b7280; }
+        .search-section { display: flex; gap: 1rem; margin-bottom: 2rem; }
+        .search-section textarea { flex-grow: 1; padding: 1rem; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; min-height: 100px; font-family: monospace; }
+        .btn { padding: 0.75rem 1.5rem; border-radius: 8px; border: none; font-size: 1rem; cursor: pointer; transition: background-color 0.2s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5a67d8; }
+        .btn-primary:disabled { background: #a3aed1; cursor: not-allowed; }
+        .loading { text-align: center; padding: 4rem; }
+        .spinner { border: 4px solid #f3f4f6; border-top: 4px solid #667eea; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 1rem; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 1.5rem; }
+        .result-card { background: #f9fafb; padding: 1.5rem; border-radius: 8px; border-left: 4px solid; }
+        .result-card.success { border-left-color: #10b981; }
+        .result-card.error { border-left-color: #ef4444; }
+        .result-header { font-weight: 600; margin-bottom: 1rem; font-family: monospace; }
+        .detail-grid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+        .detail-item { display: flex; justify-content: space-between; }
+        .detail-label { color: #6b7280; }
+        .detail-value { font-weight: 500; text-align: right; }
+        .error-message { color: #b91c1c; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        function GsxSearchPage() {
+            const [serials, setSerials] = useState('');
+            const [results, setResults] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [error, setError] = useState(null);
+
+            const customerId = new URLSearchParams(window.location.search).get('customer');
+
+            const handleSearch = async () => {
+                if (!serials.trim()) {
+                    setResults([]);
+                    return;
+                }
+                const serialList = serials.trim().split(/[\s,]+/).filter(Boolean);
+                setLoading(true);
+                setResults([]);
+                setError(null);
+
+                const promises = serialList.map(serial => 
+                    fetch(`/api/${customerId}/gsx/device-details/${serial}`)
+                        .then(res => res.json().then(data => ({ serial, data, ok: res.ok })))
+                        .catch(err => ({ serial, data: { error: err.message }, ok: false }))
+                );
+
+                const settledResults = await Promise.allSettled(promises);
+                
+                const finalResults = settledResults.map(res => {
+                    if (res.status === 'fulfilled') {
+                        return res.value;
+                    }
+                    return { serial: 'Unknown', data: { error: 'Request failed' }, ok: false };
+                });
+
+                setResults(finalResults);
+                setLoading(false);
+            };
+
+            if (!customerId) {
+                return <div className="container"><h1>Error</h1><p>No customer ID specified in URL.</p></div>;
+            }
+
+            return (
+                <div className="container">
+                    <div className="header">
+                        <h1>GSX Device Search</h1>
+                        <p>Enter one or more serial numbers below (separated by space, comma, or new line) to get device details from GSX.</p>
+                    </div>
+
+                    <div className="search-section">
+                        <textarea 
+                            value={serials}
+                            onChange={e => setSerials(e.target.value)}
+                            placeholder="Enter serial numbers..."
+                        />
+                        <button className="btn btn-primary" onClick={handleSearch} disabled={loading}>
+                            {loading ? 'Searching...' : 'Search'}
+                        </button>
+                    </div>
+
+                    {loading && (
+                        <div className="loading"><div className="spinner"></div><p>Fetching details...</p></div>
+                    )}
+
+                    {results.length > 0 && (
+                        <div className="results-grid">
+                            {results.map(({ serial, data, ok }) => (
+                                <div key={serial} className={`result-card ${ok && data.device ? 'success' : 'error'}`}>
+                                    <h3 className="result-header">{serial}</h3>
+                                    {ok && data.device ? (
+                                        <div className="detail-grid">
+                                            <div className="detail-item">
+                                                <span className="detail-label">Description</span>
+                                                <span className="detail-value">{data.device.productDescription}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <span className="detail-label">Warranty</span>
+                                                <span className="detail-value">{data.device.warrantyInfo?.warrantyStatusDescription}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <span className="detail-label">Purchase Date</span>
+                                                <span className="detail-value">{new Date(data.device.warrantyInfo?.purchaseDate).toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="detail-item">
+                                                <span className="detail-label">Sold To</span>
+                                                <span className="detail-value">{data.device.soldToName}</span>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <p className="error-message">{data.error || 'Device not found or error fetching details.'}</p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                     <div className="footer-actions" style={{marginTop: '2rem', textAlign: 'center'}}>
+                        <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="btn btn-secondary">
+                            Back to Device List
+                        </a>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<GsxSearchPage />);
+    </script>
+</body>
+</html>
