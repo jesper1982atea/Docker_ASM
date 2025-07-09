@@ -586,6 +586,11 @@ def customer_devices_page(customer_id):
     """Serve the customer-specific devices page"""
     return send_from_directory(FRONTEND_DIR, "customer-devices.html")
 
+@app.route("/sales-order-detail")
+def sales_order_detail_page():
+    """Serve the sales order detail page"""
+    return send_from_directory(FRONTEND_DIR, "sales-order-detail.html")
+
 @app.route("/sales-upload")
 def sales_upload_page():
     """Serve the sales upload page"""

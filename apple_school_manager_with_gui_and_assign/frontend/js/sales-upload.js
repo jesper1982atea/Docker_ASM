@@ -129,6 +129,11 @@ function SalesUploader() {
         }
     };
 
+    const handleRowClick = (row) => {
+        const rowData = encodeURIComponent(JSON.stringify(row));
+        window.location.href = `/sales-order-detail?data=${rowData}`;
+    };
+
     const totalPages = data ? Math.ceil(data.length / itemsPerPage) : 0;
     const paginatedData = data ? data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) : [];
 
@@ -178,7 +183,7 @@ function SalesUploader() {
                             </thead>
                             <tbody>
                                 {paginatedData.map((row, index) => (
-                                    <tr key={index}>
+                                    <tr key={index} onClick={() => handleRowClick(row)} style={{cursor: 'pointer'}}>
                                         {headers.map(header => <td key={`${index}-${header}`}>{row[header]}</td>)}
                                     </tr>
                                 ))}
