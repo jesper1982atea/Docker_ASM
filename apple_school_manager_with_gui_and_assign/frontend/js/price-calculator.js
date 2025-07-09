@@ -114,16 +114,4 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
 }
 
 window.PriceCalculator = PriceCalculator;
-                    {customSalesPrice && (
-                        <React.Fragment>
-                            <div className="detail-item price-box"><span className="detail-label">Marginal</span><span style={{color: calculations.customMargin < 0 ? 'var(--atea-red)' : 'var(--atea-green)'}}>{calculations.customMargin.toFixed(2)} SEK</span></div>
-                            <div className="detail-item price-box"><span className="detail-label">Marginal (%)</span><span style={{color: calculations.customMarginPercent < 0 ? 'var(--atea-red)' : 'var(--atea-green)'}}>{calculations.customMarginPercent.toFixed(2)}%</span></div>
-                        </React.Fragment>
-                    )}
-                 </div>
-            </div>
-        </div>
-    );
-}
 
-window.PriceCalculator = PriceCalculator;

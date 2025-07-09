@@ -188,21 +188,5 @@ function DiscountAdminPage() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<DiscountAdminPage />);
-                                <li key={program} className="item-list-item">
-                                    <span>{program}</span>
-                                    <button onClick={() => handleDelete(program)} className="btn btn-danger btn-sm">Ta bort</button>
-                                </li>
-                            ))}
-                        </ul>
-                    ) : (
-                        <p>Inga rabattprogram har laddats upp.</p>
-                    )}
-                </div>
-            </main>
-        </div>
-    );
-}
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<DiscountAdminPage />);
+    
 
