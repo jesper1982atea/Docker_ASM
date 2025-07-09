@@ -262,6 +262,7 @@ function SalesUploader() {
                                 )}
                             </select>
                         </div>
+                        <br></br>
                         <button onClick={handleBulkExport} disabled={!data || !selectedCustomer || isExporting} className="btn btn-success">
                             {isExporting ? `Exporterar... (${Math.round(exportProgress)}%)` : 'Exportera allt till Excel'}
                         </button>
