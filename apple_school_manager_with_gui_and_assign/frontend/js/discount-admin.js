@@ -287,8 +287,8 @@ function DiscountAdminPage() {
                                             <tr key={index}>
                                                 {Object.keys(row).map(key => {
                                                     let value = row[key];
-                                                    // Format numbers that look like percentages
-                                                    if (typeof value === 'number' && value <= 1 && value >= -1) {
+                                                    // Format the rebate rate column specifically as a percentage
+                                                    if (key.toLowerCase().includes('rebate rate') && typeof value === 'number') {
                                                         value = `${(value * 100).toFixed(2)}%`;
                                                     }
                                                     return <td key={key}>{String(value)}</td>;
@@ -373,16 +373,23 @@ function DiscountAdminPage() {
                         <div className="table-container" style={{ marginTop: '1.5rem', maxHeight: '400px', overflowY: 'auto' }}>
                             <table className="table">
                                 <thead>
-                                    <tr>
-                                        <th>Product Class</th>
-                                        <th>Rebate Rate (%)</th>
-                                    </tr>
+                                    {previewData.length > 0 && (
+                                        <tr>
+                                            {Object.keys(previewData[0]).map(key => <th key={key}>{key}</th>)}
+                                        </tr>
+                                    )}
                                 </thead>
                                 <tbody>
                                     {previewData.map((row, index) => (
                                         <tr key={index}>
-                                            <td>{row['Product Class']}</td>
-                                            <td>{(row['Rebate Rate (%)'] * 100).toFixed(2)}%</td>
+                                            {Object.keys(row).map(key => {
+                                                let value = row[key];
+                                                // Format the rebate rate column specifically as a percentage
+                                                if (key.toLowerCase().includes('rebate rate') && typeof value === 'number') {
+                                                    value = `${(value * 100).toFixed(2)}%`;
+                                                }
+                                                return <td key={key}>{String(value)}</td>;
+                                            })}
                                         </tr>
                                     ))}
                                 </tbody>
