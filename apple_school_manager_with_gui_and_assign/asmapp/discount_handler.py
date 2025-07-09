@@ -66,35 +66,43 @@ def save_discount_from_data(program_name, data):
         return None, str(e)
 
 def delete_discount_file(program_name):
-    """Deletes a discount program JSON file."""
+    """Deletes a discount program file."""
     setup_discounts_dir()
-    filename = f"{secure_filename(program_name)}.json"
-    filepath = os.path.join(DISCOUNTS_DIR, filename)
-    
-    if os.path.exists(filepath):
-        try:
-            os.remove(filepath)
-            return True, None
-        except Exception as e:
-            return False, str(e)
-    else:
-        return False, "File not found."
-
-
-def get_discount_data(program_name):
-    """Gets the parsed data from a specific discount program."""
-    setup_discounts_dir()
-    filename = f"{secure_filename(program_name)}.json"
+    filename = secure_filename(program_name) + ".json"
     filepath = os.path.join(DISCOUNTS_DIR, filename)
     
     if not os.path.exists(filepath):
-        return None, "Discount program not found."
+        return False, f"Discount program '{program_name}' not found."
+    
+    try:
+        os.remove(filepath)
+        logger.info(f"Deleted discount program: {filepath}")
+        return True, None
+    except Exception as e:
+        logger.error(f"Error deleting discount file {filename}: {e}")
+        return False, "Could not delete discount file."
+
+
+def get_discount_data(program_name):
+    """Gets the content of a processed discount JSON file."""
+    setup_discounts_dir()
+    filename = secure_filename(program_name) + ".json"
+    filepath = os.path.join(DISCOUNTS_DIR, filename)
+    
+    if not os.path.exists(filepath):
+        logger.warning(f"Discount program '{program_name}' not found at {filepath}.")
+        return [], f"Discount program '{program_name}' not found."
         
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        return data, None
+        # Ensure the data is a list
+        if isinstance(data, list):
+            return data, None
+        else:
+            logger.error(f"Discount file {filename} does not contain a list.")
+            return [], "Invalid data format in discount file."
     except Exception as e:
         logger.error(f"Error reading discount file {filename}: {e}")
-        return None, "Could not read or parse discount file."
+        return [], "Could not read or parse discount file."
 
