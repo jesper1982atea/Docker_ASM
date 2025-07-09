@@ -41,6 +41,7 @@ def parse_discount_excel(file_stream):
         
         # Trim whitespace from column headers to avoid matching issues
         df.columns = df.columns.str.strip()
+        logger.debug(f"Columns found in Excel file: {df.columns.tolist()}")
         
         # Define expected headers
         required_headers = ['Product Class', 'Rebate Rate (%)', 'Program Name']
@@ -52,10 +53,13 @@ def parse_discount_excel(file_stream):
             return None, None, f"Missing required columns: {', '.join(missing)}"
 
         # Drop rows where essential columns are empty
+        initial_rows = len(df)
         df.dropna(subset=['Product Class', 'Rebate Rate (%)', 'Program Name'], inplace=True)
+        logger.debug(f"Rows before cleaning: {initial_rows}. Rows after dropping NA: {len(df)}.")
 
         # Check if there is any data left
         if df.empty:
+            logger.warning("No valid data rows found after removing rows with empty required values.")
             return None, None, "No valid data found in the file after cleaning."
 
         # Extract program name. Assume it's the same for all rows.
@@ -71,10 +75,12 @@ def parse_discount_excel(file_stream):
         data = df[['Product Class', 'Rebate Rate']].to_dict('records')
         
         if not data:
+            logger.error("Data became empty after converting to dictionary. This should not happen if rows exist.")
             return None, None, "No rows with valid rebate rates found."
 
+        logger.info(f"Successfully parsed {len(data)} discount entries for program '{program_name}'.")
         return program_name, data, None
 
     except Exception as e:
-        logger.error(f"Error parsing discount excel file: {e}")
+        logger.error(f"Error parsing discount excel file: {e}", exc_info=True)
         return None, None, str(e)
