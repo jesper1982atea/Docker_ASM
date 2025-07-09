@@ -51,8 +51,7 @@ function DiscountAdminPage() {
         const f = event.target.files[0];
         if (!f) return;
         setFile(f);
-        setProgramName(f.name.replace(/\.(xlsx|xls)$/, ''));
-
+        
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
@@ -60,15 +59,34 @@ function DiscountAdminPage() {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet);
                 
-                const sanitizedData = json.map(row => ({
-                    ...row,
-                    'Rebate Rate': parseFloat(row['Rebate Rate']) || 0
-                }));
+                // Tell sheet_to_json that headers are on row 3 (index 2)
+                const json = XLSX.utils.sheet_to_json(worksheet, { header: 2 });
+
+                // Find the program name from the first row of data
+                const programNameFromFile = json.length > 0 ? json[0]['Program Name'] : f.name.replace(/\.(xlsx|xls)$/, '');
+                setProgramName(programNameFromFile);
+
+                const sanitizedData = json
+                    .filter(row => row['Product Class'] && row['Rebate Rate (%)'] !== undefined)
+                    .map(row => {
+                        let rate = row['Rebate Rate (%)'];
+                        if (typeof rate === 'string') {
+                            rate = rate.replace('%', '').trim();
+                        }
+                        const rateFloat = parseFloat(rate);
+                        // Convert percentage to decimal, e.g., 5 -> 0.05
+                        const finalRate = !isNaN(rateFloat) ? (rateFloat > 1 ? rateFloat / 100 : rateFloat) : 0;
+
+                        return {
+                            'Product Class': row['Product Class'],
+                            'Rebate Rate': finalRate
+                        };
+                    });
+
                 setPreviewData(sanitizedData);
             } catch (err) {
-                setError('Kunde inte läsa filen. Se till att den är i rätt format.');
+                setError('Kunde inte läsa filen. Se till att den är i rätt format och att rubrikerna är på rad 3.');
                 console.error(err);
             }
         };
@@ -76,6 +94,10 @@ function DiscountAdminPage() {
     };
 
     const handleUpload = async () => {
+        if (!file) {
+            setError('Ingen fil vald för uppladdning.');
+            return;
+        }
         if (!programName || !previewData) {
             setError('Programnamn och förhandsgranskad data får inte vara tom.');
             return;
