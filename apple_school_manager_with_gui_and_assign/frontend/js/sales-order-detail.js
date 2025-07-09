@@ -467,8 +467,8 @@ function SalesOrderDetailPage() {
                             discountRate={discountMap.get(priceInfo.category) || 0}
                             originalDeal={{
                                 sales: priceInfo.sales,
-                                margin: priceInfo.sales - priceInfo.actualCost,
-                                marginPercent: priceInfo.sales !== 0 ? ((priceInfo.sales - priceInfo.actualCost) / priceInfo.sales) * 100 : 0
+                                margin: priceInfo.sales - priceInfo.actualCost
+                                // marginPercent is now calculated inside the calculator based on its own logic
                             }}
                         />
                     </div>

@@ -30,10 +30,12 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
 
         const priceDiff = newDeal.salesPrice - originalDeal.sales;
         const marginDiff = newDeal.marginValue - originalDeal.margin;
+        const originalMarginPercent = originalDeal.sales !== 0 ? (originalDeal.margin / originalDeal.sales) * 100 : 0;
 
         return {
             priceDiff,
             marginDiff,
+            originalMarginPercent
         };
     }, [originalDeal, newDeal]);
 
@@ -99,9 +101,9 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
                             </span>
                         </div>
                          <div className="detail-item price-box" style={{background: 'var(--atea-light-grey)'}}>
-                            <span className="detail-label">Ny vs. Gammal marginal</span>
+                             <span className="detail-label">Ny vs. Gammal marginal</span>
                              <span className="detail-value" style={{color: 'var(--atea-green)'}}>
-                                {newDeal.marginPercent.toFixed(2)}% vs. {originalDeal.marginPercent.toFixed(2)}%
+                                {newDeal.marginPercent.toFixed(2)}% vs. {comparison.originalMarginPercent.toFixed(2)}%
                             </span>
                         </div>
                     </div>
@@ -112,8 +114,6 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
 }
 
 window.PriceCalculator = PriceCalculator;
-                        <input type="number" id="custom-sales-price" value={customSalesPrice} onChange={e => setCustomSalesPrice(e.target.value)} placeholder="Ange kundpris"/>
-                    </div>
                     {customSalesPrice && (
                         <React.Fragment>
                             <div className="detail-item price-box"><span className="detail-label">Marginal</span><span style={{color: calculations.customMargin < 0 ? 'var(--atea-red)' : 'var(--atea-green)'}}>{calculations.customMargin.toFixed(2)} SEK</span></div>
