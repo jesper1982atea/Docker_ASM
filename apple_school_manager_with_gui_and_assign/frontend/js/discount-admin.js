@@ -11,6 +11,11 @@ function DiscountAdminPage() {
     const [programName, setProgramName] = useState('');
     const [rawPreviewData, setRawPreviewData] = useState(null); // For debugging
 
+    // State for viewing a program
+    const [viewedProgramData, setViewedProgramData] = useState(null);
+    const [viewedProgramName, setViewedProgramName] = useState('');
+    const [loadingView, setLoadingView] = useState(false);
+
     // State for global functional discounts
     const [functionalDiscounts, setFunctionalDiscounts] = useState([]);
     const [loadingFunctional, setLoadingFunctional] = useState(true);
@@ -188,6 +193,26 @@ function DiscountAdminPage() {
         }
     };
 
+    const handleViewProgram = async (programName) => {
+        setLoadingView(true);
+        setViewedProgramData(null); // Clear previous data
+        setViewedProgramName(programName);
+        setError('');
+        try {
+            const res = await fetch(`/api/discounts/${programName}`);
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.error || `Kunde inte hämta programmet ${programName}`);
+            }
+            const data = await res.json();
+            setViewedProgramData(data);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setLoadingView(false);
+        }
+    };
+
     // --- Handlers for Functional Discounts ---
     const handleAddFunctionalDiscount = () => {
         setFunctionalDiscounts([...functionalDiscounts, { category: 'Mac', discount: 0.125 }]);
@@ -241,6 +266,38 @@ function DiscountAdminPage() {
                     <a href="/frontend/" className="header-link">⬅️ Tillbaka till Admin</a>
                 </div>
             </header>
+
+            {/* --- View Program Modal --- */}
+            {viewedProgramName && (
+                <div className="modal-overlay" onClick={() => setViewedProgramName('')}>
+                    <div className="modal-content card" onClick={e => e.stopPropagation()}>
+                        <h3>Granskar program: {viewedProgramName}</h3>
+                        {loadingView ? (
+                            <div className="loading"><div className="spinner-small"></div><p>Laddar...</p></div>
+                        ) : viewedProgramData ? (
+                            <div className="table-container" style={{ marginTop: '1.5rem', maxHeight: '60vh', overflowY: 'auto' }}>
+                                <table className="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Product Class</th>
+                                            <th>Rebate Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {viewedProgramData.map((row, index) => (
+                                            <tr key={index}>
+                                                <td>{row['Product Class']}</td>
+                                                <td>{(row['Rebate Rate'] * 100).toFixed(2)}%</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : <p>Kunde inte ladda programdata.</p>}
+                        <button onClick={() => setViewedProgramName('')} className="btn" style={{ marginTop: '1rem' }}>Stäng</button>
+                    </div>
+                </div>
+            )}
 
             {/* --- Global Functional Discounts Card --- */}
             <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
@@ -367,7 +424,9 @@ function DiscountAdminPage() {
                     <ul className="file-list">
                         {discounts.map(name => (
                             <li key={name}>
-                                <span>{name}</span>
+                                <a href="#" className="program-name-link" onClick={(e) => { e.preventDefault(); handleViewProgram(name); }}>
+                                    {name}
+                                </a>
                                 <button onClick={() => handleDelete(name)} className="btn-delete">&times;</button>
                             </li>
                         ))}
