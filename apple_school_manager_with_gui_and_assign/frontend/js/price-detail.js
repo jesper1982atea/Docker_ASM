@@ -8,6 +8,8 @@ function PriceDetailPage() {
     const [discounts, setDiscounts] = useState([]);
     const [selectedDiscount, setSelectedDiscount] = useState('');
     const [discountData, setDiscountData] = useState(null);
+    const [residualValuePercent, setResidualValuePercent] = useState('');
+    const [leaseTerm, setLeaseTerm] = useState(36);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -113,9 +115,19 @@ function PriceDetailPage() {
         }
     };
 
+    const handleResidualValueChange = (e) => {
+        const newResidualStr = e.target.value;
+        setResidualValuePercent(newResidualStr);
+    };
+
     const customerPriceNum = parseFloat(String(customerPrice).replace(',', '.')) || 0;
     const profitSEK = (customerPriceNum > 0 && discountedBasePrice > 0 && customerPriceNum >= discountedBasePrice) ? customerPriceNum - discountedBasePrice : 0;
     const displayMargin = (customerPriceNum > 0 && discountedBasePrice > 0 && customerPriceNum >= discountedBasePrice) ? (profitSEK / customerPriceNum) * 100 : 0;
+
+    const residualValueNum = parseFloat(residualValuePercent) || 0;
+    const residualValueSEK = customerPriceNum * (residualValueNum / 100);
+    const finalPrice = customerPriceNum - residualValueSEK;
+    const monthlyPrice = finalPrice > 0 ? finalPrice / leaseTerm : 0;
 
     const renderValue = (value) => {
         if (typeof value === 'boolean') {
@@ -267,18 +279,68 @@ function PriceDetailPage() {
                                 />
                             </div>
 
-                            <div className="price-result">
-                                <div className="result-item">
-                                    <label>Vinst (kr)</label>
-                                    <div className={`result-value ${profitSEK > 0 ? 'profit' : ''}`}>
-                                        {formatNumber(profitSEK)} kr
-                                    </div>
+                            <div className="price-item">
+                                <label htmlFor="residual-value-percent">Ange restvärde (%)</label>
+                                <input
+                                    type="number"
+                                    id="residual-value-percent"
+                                    value={residualValuePercent}
+                                    onChange={handleResidualValueChange}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    max="99.99"
+                                />
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="50"
+                                    step="0.5"
+                                    value={residualValuePercent || 0}
+                                    onChange={handleResidualValueChange}
+                                    style={{marginTop: '0.5rem'}}
+                                />
+                            </div>
+
+                            <div className="price-item">
+                                <label>Välj avtalsperiod</label>
+                                <div className="term-selector">
+                                    {[24, 36, 48].map(term => (
+                                        <button
+                                            key={term}
+                                            className={`term-btn ${leaseTerm === term ? 'active' : ''}`}
+                                            onClick={() => setLeaseTerm(term)}
+                                        >
+                                            {term} mån
+                                        </button>
+                                    ))}
                                 </div>
-                                <div className="result-item">
-                                    <label>Marginal (%)</label>
-                                    <div className={`result-value ${displayMargin > 0 ? 'profit' : ''}`}>
-                                        {formatNumber(displayMargin)} %
-                                    </div>
+                            </div>
+
+                            <div className="price-summary">
+                                <div className="summary-row">
+                                    <span>Vinst (kr)</span>
+                                    <span className={`value ${profitSEK > 0 ? 'profit' : ''}`}>{formatNumber(profitSEK)} kr</span>
+                                </div>
+                                <div className="summary-row">
+                                    <span>Marginal (%)</span>
+                                    <span className={`value ${displayMargin > 0 ? 'profit' : ''}`}>{formatNumber(displayMargin)} %</span>
+                                </div>
+                                <hr />
+                                <div className="summary-row">
+                                    <span>Kundpris (Ex. moms)</span>
+                                    <span className="value">{formatNumber(customerPriceNum)} kr</span>
+                                </div>
+                                <div className="summary-row">
+                                    <span>Restvärde ({residualValueNum}%)</span>
+                                    <span className="value">- {formatNumber(residualValueSEK)} kr</span>
+                                </div>
+                                <div className="summary-row total">
+                                    <span>Totalt pris (efter restvärde)</span>
+                                    <span className="value">{formatNumber(finalPrice)} kr</span>
+                                </div>
+                                <div className="summary-row monthly-price">
+                                    <span>Pris per månad ({leaseTerm} mån)</span>
+                                    <span className="value">{formatNumber(monthlyPrice)} kr</span>
                                 </div>
                             </div>
                         </div>

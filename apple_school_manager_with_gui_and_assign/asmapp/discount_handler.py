@@ -21,6 +21,18 @@ def list_discounts():
     except FileNotFoundError:
         return []
 
+def _get_value_from_row(row, target_key):
+    """
+    Gets a value from a dictionary, matching the key case-insensitively 
+    and ignoring non-alphanumeric characters.
+    """
+    normalized_target = ''.join(filter(str.isalnum, target_key.lower()))
+    for key, value in row.items():
+        normalized_key = ''.join(filter(str.isalnum, str(key).lower()))
+        if normalized_key == normalized_target:
+            return value
+    return None
+
 def save_discount_from_data(program_name, data):
     """
     Processes a list of dictionaries (from JSON) and saves the discount map.
@@ -32,30 +44,25 @@ def save_discount_from_data(program_name, data):
         return None, "No data provided"
 
     logger.info(f"Processing discount data for program: {program_name}")
-    # Log first row to see the structure and keys
     if data:
-        logger.debug(f"First row of data received: {data[0]}")
+        logger.debug(f"First row of data received for processing: {data[0]}")
 
     try:
         discount_map = {}
         
-        # Define the keys we are looking for
-        product_class_key = 'Product Class'
-        rebate_rate_key = 'Rebate Rate (%)'
-
         for row_data in data:
-            # Normalize keys by stripping whitespace
-            normalized_row = {k.strip(): v for k, v in row_data.items()}
-
-            product_class = normalized_row.get(product_class_key)
-            rebate_rate = normalized_row.get(rebate_rate_key)
+            product_class = _get_value_from_row(row_data, 'Product Class')
+            rebate_rate = _get_value_from_row(row_data, 'Rebate Rate (%)')
 
             # Skip if essential data is missing, empty, or if we already have this class
             if not product_class or rebate_rate is None or product_class in discount_map:
                 continue
 
             try:
-                # Convert rebate rate to a numeric value and then to a decimal
+                # Handle comma as decimal separator and convert to float
+                if isinstance(rebate_rate, str):
+                    rebate_rate = rebate_rate.replace(',', '.')
+                
                 rebate_decimal = float(rebate_rate) / 100.0
                 discount_map[product_class] = rebate_decimal
             except (ValueError, TypeError):
