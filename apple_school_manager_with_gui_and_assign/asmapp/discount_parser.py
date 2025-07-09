@@ -58,7 +58,11 @@ def parse_discount_excel(file_stream):
         # Drop rows where ALL columns are NaN (empty rows)
         df.dropna(how='all', inplace=True)
         
-        # Drop rows where essential columns are empty
+        # Forward-fill the 'product class' column to handle merged cells or empty values
+        # This assumes that a product class applies to all rows below it until a new one is specified.
+        df['product class'].ffill(inplace=True)
+
+        # Drop rows where essential columns are empty AFTER forward-filling
         initial_rows = len(df)
         df.dropna(subset=['product class', 'rebate rate (%)', 'program name'], inplace=True)
         logger.debug(f"Rows before cleaning: {initial_rows}. Rows after dropping NA: {len(df)}.")
