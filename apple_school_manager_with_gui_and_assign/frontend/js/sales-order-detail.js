@@ -3,8 +3,9 @@ const { useState, useEffect, useMemo } = React;
 function PriceAnalysisBlock({ priceInfo, discountMap, discountLoading }) {
     const { cost, sales, actualCost, category } = priceInfo;
 
-    const rebateRate = discountMap.get(category) || 0;
-    const discountedAlp = cost * (1 - rebateRate);
+    // The discount rate from the map is now the combined (functional + program) rate
+    const totalRebateRate = discountMap.get(category) || 0;
+    const discountedAlp = cost * (1 - totalRebateRate); // This is Atea's calculated cost
     const diff = actualCost - discountedAlp;
     const diffPercent = cost !== 0 ? (diff / cost) * 100 : 0;
 
@@ -40,8 +41,8 @@ function PriceAnalysisBlock({ priceInfo, discountMap, discountLoading }) {
                             <span className="detail-value">{cost.toFixed(2)} SEK</span>
                         </div>
                         <div className="detail-item price-box">
-                            <span className="detail-label">Rabatt ({(rebateRate * 100).toFixed(1)}%)</span>
-                            <span className="detail-value" style={{color: 'var(--atea-red)'}}>-{(cost * rebateRate).toFixed(2)} SEK</span>
+                            <span className="detail-label">Total rabatt ({(totalRebateRate * 100).toFixed(2)}%)</span>
+                            <span className="detail-value" style={{color: 'var(--atea-red)'}}>-{(cost * totalRebateRate).toFixed(2)} SEK</span>
                         </div>
                         <div className="detail-item price-box">
                             <span className="detail-label">Beräknat inköpspris</span>
@@ -465,7 +466,7 @@ function SalesOrderDetailPage() {
                         </p>
                         <window.PriceCalculator 
                             listPrice={priceInfo.cost} 
-                            discountRate={discountMap.get(priceInfo.category) || 0}
+                            discountRate={discountMap.get(priceInfo.category) || 0} // Pass the combined rate
                             originalDeal={{
                                 sales: priceInfo.sales,
                                 margin: priceInfo.sales - priceInfo.actualCost

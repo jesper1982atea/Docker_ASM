@@ -135,17 +135,21 @@ def _get_raw_discount_data(program_name):
 def get_discount_data(program_name):
     """
     Gets the content of a discount program and applies global functional discounts on top.
+    This version correctly combines both discount lists.
     """
     program_data, error = _get_raw_discount_data(program_name)
     if error:
         return [], error
 
     functional_discounts = get_functional_discounts()
-    if not functional_discounts:
-        return program_data, None
+    
+    # Create a dictionary for program-specific rebates for quick lookup
+    program_rebate_map = {row['Product Class']: float(row.get('Rebate Rate', 0)) for row in program_data}
 
-    functional_discount_map = {item['category']: float(item['discount']) for item in functional_discounts}
+    # Create a map of functional rebates by category
+    functional_rebate_map = {item['category']: float(item['discount']) for item in functional_discounts}
 
+    # Define keywords for each functional category
     category_keywords = {
         'Mac': ['mac', 'display'],
         'iPad': ['ipad'],
@@ -153,30 +157,38 @@ def get_discount_data(program_name):
         'Watch': ['watch'],
         'Accessories': ['magic', 'pencil', 'adapter', 'cable', 'airtag', 'airpods', 'beatsbydre', 'tv', 'homepod']
     }
-    
-    product_class_to_category = {
+
+    # Create a reverse map from keyword to category name
+    keyword_to_category = {
         keyword: category 
         for category, keywords in category_keywords.items() 
         for keyword in keywords
     }
 
-    augmented_data = []
-    for row in program_data:
-        new_row = row.copy()
-        product_class = (new_row.get('Product Class') or '').lower()
+    # Use all product classes from the program as the base
+    all_product_classes = set(program_rebate_map.keys())
+    
+    combined_discounts = {}
+
+    # Iterate over all unique product classes from the customer program
+    for product_class in all_product_classes:
+        product_class_lower = product_class.lower()
         
-        assigned_category = None
-        for keyword, category_name in product_class_to_category.items():
-            if keyword in product_class:
-                assigned_category = category_name
-                break
+        # Get the base program rebate
+        program_rebate = program_rebate_map.get(product_class, 0)
         
-        if assigned_category and assigned_category in functional_discount_map:
-            functional_rebate = functional_discount_map[assigned_category]
-            original_rebate = float(new_row.get('Rebate Rate', 0))
-            new_row['Rebate Rate'] = original_rebate + functional_rebate
+        # Find the corresponding functional category and its rebate
+        functional_rebate = 0
+        for keyword, category_name in keyword_to_category.items():
+            if keyword in product_class_lower:
+                functional_rebate = functional_rebate_map.get(category_name, 0)
+                break # Stop after first match
         
-        augmented_data.append(new_row)
+        # Combine rebates and store
+        combined_discounts[product_class] = program_rebate + functional_rebate
+
+    # Convert the combined dictionary back to the desired list format
+    final_data = [{'Product Class': pc, 'Rebate Rate': rate} for pc, rate in combined_discounts.items()]
             
-    return augmented_data, None
+    return final_data, None
 

@@ -5,13 +5,14 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
     const [residualValuePercent, setResidualValuePercent] = useState(10);
     const [leasePeriodMonths, setLeasePeriodMonths] = useState(36);
 
-    const discountedAlp = useMemo(() => (parseFloat(listPrice) || 0) * (1 - discountRate), [listPrice, discountRate]);
+    // This is Atea's final cost after all discounts (functional + program)
+    const ateaCostPrice = useMemo(() => (parseFloat(listPrice) || 0) * (1 - discountRate), [listPrice, discountRate]);
 
     const newDeal = useMemo(() => {
-        if (discountedAlp === 0) return null;
+        if (ateaCostPrice === 0) return null;
 
-        const newSalesPrice = discountedAlp / (1 - (targetMarginPercent / 100));
-        const newMarginValue = newSalesPrice - discountedAlp;
+        const newSalesPrice = ateaCostPrice / (1 - (targetMarginPercent / 100));
+        const newMarginValue = newSalesPrice - ateaCostPrice;
         
         const residualValueAmount = newSalesPrice * (residualValuePercent / 100);
         const financingAmount = newSalesPrice - residualValueAmount; // This is the amount the customer pays over the lease period
@@ -25,7 +26,7 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
             financingAmount: financingAmount,
             residualValueAmount: residualValueAmount
         };
-    }, [discountedAlp, targetMarginPercent, residualValuePercent, leasePeriodMonths]);
+    }, [ateaCostPrice, targetMarginPercent, residualValuePercent, leasePeriodMonths]);
 
     const comparison = useMemo(() => {
         if (!originalDeal || !newDeal) return null;
@@ -41,7 +42,7 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
         };
     }, [originalDeal, newDeal]);
 
-    if (discountedAlp === 0) {
+    if (listPrice === 0) {
         return <p>Väntar på prisinformation för att kunna starta kalkylatorn...</p>;
     }
 
@@ -49,9 +50,19 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
         <div className="price-calculator">
             <div className="calculator-inputs" style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="form-group">
-                    <label>Inköpspris (efter rabatt)</label>
-                    <input type="text" value={`${discountedAlp.toFixed(2)} SEK`} disabled />
+                    <label>Listpris (ALP)</label>
+                    <input type="text" value={`${parseFloat(listPrice).toFixed(2)} SEK`} disabled />
                 </div>
+                <div className="form-group">
+                    <label>Total rabatt (Funktionell + Program)</label>
+                    <input type="text" value={`${(discountRate * 100).toFixed(2)} %`} disabled />
+                </div>
+                <div className="form-group">
+                    <label>Ateas Inköpspris</label>
+                    <input type="text" value={`${ateaCostPrice.toFixed(2)} SEK`} disabled style={{fontWeight: 'bold', color: 'var(--atea-green)'}}/>
+                </div>
+            </div>
+            <div className="calculator-inputs" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.5rem', marginBottom: '1.5rem' }}>
                 <div className="form-group">
                     <label htmlFor="target-margin">Önskad marginal (%)</label>
                     <input type="number" id="target-margin" value={targetMarginPercent} onChange={e => setTargetMarginPercent(parseFloat(e.target.value) || 0)} />
