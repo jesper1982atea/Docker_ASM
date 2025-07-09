@@ -317,30 +317,43 @@ function PriceDetailPage() {
                             </div>
 
                             <div className="price-summary">
-                                <div className="summary-row">
-                                    <span>Vinst (kr)</span>
-                                    <span className={`value ${profitSEK > 0 ? 'profit' : ''}`}>{formatNumber(profitSEK)} kr</span>
+                                <div className="summary-section">
+                                    <h4 className="summary-header">Prisberäkning</h4>
+                                    <div className="summary-row">
+                                        <span>Rabatterat inköpspris</span>
+                                        <span className="value">{formatNumber(discountedBasePrice)} kr</span>
+                                    </div>
+                                    <div className="summary-row">
+                                        <span>Vinst</span>
+                                        <span className={`value ${profitSEK > 0 ? 'profit' : ''}`}>{formatNumber(profitSEK)} kr</span>
+                                    </div>
+                                    <div className="summary-row">
+                                        <span>Marginal</span>
+                                        <span className={`value ${displayMargin > 0 ? 'profit' : ''}`}>{formatNumber(displayMargin)} %</span>
+                                    </div>
                                 </div>
-                                <div className="summary-row">
-                                    <span>Marginal (%)</span>
-                                    <span className={`value ${displayMargin > 0 ? 'profit' : ''}`}>{formatNumber(displayMargin)} %</span>
+
+                                <div className="summary-section">
+                                    <h4 className="summary-header">Kundens Pris</h4>
+                                    <div className="summary-row">
+                                        <span>Pris till kund (Ex. moms)</span>
+                                        <span className="value">{formatNumber(customerPriceNum)} kr</span>
+                                    </div>
+                                    <div className="summary-row">
+                                        <span>Restvärde ({residualValueNum}%)</span>
+                                        <span className="value">- {formatNumber(residualValueSEK)} kr</span>
+                                    </div>
+                                    <div className="summary-row total">
+                                        <span>Kundens totala kostnad</span>
+                                        <span className="value">{formatNumber(finalPrice)} kr</span>
+                                    </div>
                                 </div>
-                                <hr />
-                                <div className="summary-row">
-                                    <span>Kundpris (Ex. moms)</span>
-                                    <span className="value">{formatNumber(customerPriceNum)} kr</span>
-                                </div>
-                                <div className="summary-row">
-                                    <span>Restvärde ({residualValueNum}%)</span>
-                                    <span className="value">- {formatNumber(residualValueSEK)} kr</span>
-                                </div>
-                                <div className="summary-row total">
-                                    <span>Totalt pris (efter restvärde)</span>
-                                    <span className="value">{formatNumber(finalPrice)} kr</span>
-                                </div>
-                                <div className="summary-row monthly-price">
-                                    <span>Pris per månad ({leaseTerm} mån)</span>
-                                    <span className="value">{formatNumber(monthlyPrice)} kr</span>
+
+                                <div className="summary-section monthly">
+                                     <div className="summary-row monthly-price">
+                                        <span>Pris per månad ({leaseTerm} mån)</span>
+                                        <span className="value">{formatNumber(monthlyPrice)} kr</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
