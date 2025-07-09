@@ -9,18 +9,20 @@ logger = logging.getLogger(__name__)
 DISCOUNTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'admin_api', 'discounts')
 
 def setup_discounts_dir():
-    """Ensures the discounts directory exists."""
-    os.makedirs(DISCOUNTS_DIR, exist_ok=True)
+    if not os.path.exists(DISCOUNTS_DIR):
+        os.makedirs(DISCOUNTS_DIR)
 
 def list_discounts():
-    """Lists available discount program files."""
+    """Lists all available discount program files."""
+    setup_discounts_dir()
     try:
-        return [f for f in os.listdir(DISCOUNTS_DIR) if f.endswith(('.xlsx', '.xls'))]
+        # List only excel files
+        return sorted([f for f in os.listdir(DISCOUNTS_DIR) if f.endswith(('.xlsx', '.xls'))])
     except FileNotFoundError:
         return []
 
 def _create_discount_json(excel_path, program_name):
-    """Parses the excel file and creates a corresponding JSON file."""
+    """Parses the excel file and creates a corresponding JSON file based on Product Class."""
     try:
         # Headers are on row 3, so we skip first 2 rows.
         df = pd.read_excel(excel_path, header=2)
@@ -42,7 +44,7 @@ def _create_discount_json(excel_path, program_name):
         df['RebateRate'] = pd.to_numeric(df['RebateRate'], errors='coerce')
         df.dropna(subset=['RebateRate'], inplace=True)
 
-        # Create a dictionary from ProductClass to RebateRate (as decimal)
+        # Create a dictionary from ProductClass to RebateRate
         # If there are duplicates, keep the first one
         discount_map = df.drop_duplicates(subset=['ProductClass']).set_index('ProductClass')['RebateRate'].to_dict()
         
@@ -55,7 +57,7 @@ def _create_discount_json(excel_path, program_name):
         json_filepath = os.path.join(DISCOUNTS_DIR, json_filename)
         
         with open(json_filepath, 'w') as f:
-            json.dump(discount_map, f)
+            json.dump(discount_map, f, indent=2)
         
         logger.info(f"Successfully created discount JSON: {json_filename}")
         return True, None
@@ -79,17 +81,24 @@ def save_discount_file(file, program_name=None):
     else:
         filename = secure_filename(file.filename)
     
-    filepath = os.path.join(DISCOUNTS_DIR, filename)
-    file.save(filepath)
-    logger.info(f"Saved discount file: {filename}")
+    # Use a temporary name to avoid confusion if JSON parsing fails
+    temp_filepath = os.path.join(DISCOUNTS_DIR, f"temp_{filename}")
+    file.save(temp_filepath)
+    logger.info(f"Saved temporary discount file: {temp_filepath}")
 
     # Now, create the JSON version
-    success, error = _create_discount_json(filepath, program_name or os.path.splitext(filename)[0])
+    effective_program_name = program_name or os.path.splitext(filename)[0]
+    success, error = _create_discount_json(temp_filepath, effective_program_name)
+    
     if not success:
-        # If JSON creation fails, we might want to remove the uploaded excel file
-        # to avoid inconsistent state. For now, we just log the error.
-        logger.error(f"Failed to create JSON for {filename}. The Excel file was saved, but will not be usable.")
-        return None, f"Excel file saved, but failed to process it into a usable format: {error}"
+        os.remove(temp_filepath) # Clean up temp file
+        logger.error(f"Failed to create JSON for {filename}. The Excel file was not saved.")
+        return None, f"Failed to process Excel file: {error}"
+
+    # If successful, rename temp file to final name
+    final_filepath = os.path.join(DISCOUNTS_DIR, filename)
+    os.rename(temp_filepath, final_filepath)
+    logger.info(f"Finalized saving discount file: {filename}")
 
     return filename, None
 
@@ -114,17 +123,14 @@ def delete_discount_file(filename):
 
 def get_discount_data(filename):
     """
-    Parses a discount Excel file and returns a dictionary mapping
-    Part Number to a discount percentage.
+    Reads a processed discount JSON file and returns the discount map.
     """
     program_name, _ = os.path.splitext(filename)
     json_filename = f"{secure_filename(program_name)}.json"
     filepath = os.path.join(DISCOUNTS_DIR, json_filename)
 
     if not os.path.exists(filepath):
-        # Maybe try to generate it on the fly if the excel exists?
-        # For now, we assume it must be created on upload.
-        return None, f"Discount program '{program_name}' has not been processed correctly. Please re-upload."
+        return None, f"Discount program '{program_name}' has not been processed. Please re-upload."
         
     try:
         with open(filepath, 'r') as f:

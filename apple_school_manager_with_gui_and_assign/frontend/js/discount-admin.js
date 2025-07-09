@@ -154,16 +154,14 @@ function DiscountAdminPage() {
                             <table className="table">
                                 <thead>
                                     <tr>
-                                        <th>Product Nr./CID Nr.</th>
-                                        <th>Product Description</th>
+                                        <th>Product Class</th>
                                         <th>Rebate Rate (%)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {previewData.map((row, index) => (
+                                    {previewData.filter(row => row['Product Class'] && row['Rebate Rate (%)'] !== undefined).map((row, index) => (
                                         <tr key={index}>
-                                            <td>{row['Product Nr./CID Nr.']}</td>
-                                            <td>{row['Product Description']}</td>
+                                            <td>{row['Product Class']}</td>
                                             <td>{row['Rebate Rate (%)']}</td>
                                         </tr>
                                     ))}
@@ -200,5 +198,7 @@ function DiscountAdminPage() {
     );
 }
 
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<DiscountAdminPage />);
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<DiscountAdminPage />);
