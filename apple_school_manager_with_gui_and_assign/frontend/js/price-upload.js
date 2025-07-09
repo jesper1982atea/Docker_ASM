@@ -299,26 +299,4 @@ function PriceUploader() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<PriceUploader />);
-                                            <td>{row['Part Number']}</td>
-                                            <td>{row['Description']}</td>
-                                            <td>{row['ALP Ex VAT']}</td>
-                                            <td>{row['ALP Inc VAT']}</td>
-                                            <td>{row['NPI']}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div style={{marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
-                             <span>Visar {paginatedData.length} av {filteredData.length} produkter</span>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<PriceUploader />);
+ 
