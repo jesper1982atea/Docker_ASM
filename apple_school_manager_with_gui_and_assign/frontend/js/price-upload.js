@@ -59,8 +59,6 @@ function PriceUploader() {
     const [fileName, setFileName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
-    const [selectedScreenSize, setSelectedScreenSize] = useState('All');
-    const [selectedColor, setSelectedColor] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
     const [processedFiles, setProcessedFiles] = useState([]);
@@ -152,17 +150,16 @@ function PriceUploader() {
         return ['All', ...uniqueCategories.filter(c => c && c !== 'Uncategorized').sort(), 'Uncategorized'];
     }, [data]);
 
-    const screenSizes = useMemo(() => {
+    const smartTags = useMemo(() => {
         if (!data) return [];
-        const uniqueSizes = [...new Set(data.map(item => item['Screen Size']))];
-        return ['All', ...uniqueSizes.filter(s => s && s !== 'N/A').sort()];
-    }, [data]);
-
-    const colors = useMemo(() => {
-        if (!data) return [];
-        const uniqueColors = [...new Set(data.map(item => item['Color']))];
-        return ['All', ...uniqueColors.filter(c => c).sort()];
-    }, [data]);
+        const productLines = [...new Set(data.map(item => item['Product Line']))];
+        const screenSizes = [...new Set(data.map(item => item['Screen Size']))];
+        const colors = [...new Set(data.map(item => item['Color']))];
+        
+        return [...productLines, ...screenSizes, ...colors]
+            .filter(tag => tag && tag !== 'N/A' && !searchTerm.toLowerCase().includes(tag.toLowerCase()))
+            .slice(0, 10); // Show top 10 relevant tags
+    }, [data, searchTerm]);
 
     const filteredData = useMemo(() => {
         let result = data;
@@ -171,21 +168,13 @@ function PriceUploader() {
             result = result.filter(row => row.Category === selectedCategory);
         }
 
-        if (selectedScreenSize && selectedScreenSize !== 'All') {
-            result = result.filter(row => row['Screen Size'] === selectedScreenSize);
-        }
-
-        if (selectedColor && selectedColor !== 'All') {
-            result = result.filter(row => row['Color'] === selectedColor);
-        }
-
         if (!searchTerm) return result;
         return result.filter(row =>
             Object.values(row).some(value =>
                 String(value).toLowerCase().includes(searchTerm.toLowerCase())
             )
         );
-    }, [data, searchTerm, selectedCategory, selectedScreenSize, selectedColor]);
+    }, [data, searchTerm, selectedCategory]);
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -193,6 +182,11 @@ function PriceUploader() {
     const handleRowClick = (rowData) => {
         const dataString = encodeURIComponent(JSON.stringify(rowData));
         window.open(`/price-detail?data=${dataString}`, '_blank');
+    };
+
+    const handleTagClick = (tag) => {
+        setSearchTerm(prev => prev ? `${prev} ${tag}` : tag);
+        setCurrentPage(1);
     };
 
     return (
@@ -243,10 +237,17 @@ function PriceUploader() {
                                     <input
                                         type="text"
                                         id="search-term"
-                                        placeholder="Sök på artikelnummer, beskrivning, etc."
+                                        placeholder="Sök på artikelnummer, färg, storlek etc."
                                         value={searchTerm}
                                         onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                     />
+                                    <div className="smart-tags" style={{ marginTop: '0.5rem' }}>
+                                        {smartTags.map(tag => (
+                                            <button key={tag} className="btn-tag" onClick={() => handleTagClick(tag)}>
+                                                + {tag}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                                 <div className="filter-group">
                                     <label htmlFor="category-filter">Filtrera på kategori</label>
@@ -259,30 +260,6 @@ function PriceUploader() {
                                     </select>
                                 </div>
                             </div>
-                            {screenSizes.length > 1 && (
-                                <div className="filter-group" style={{marginTop: '1rem'}}>
-                                    <label>Skärmstorlek</label>
-                                    <div className="button-group">
-                                        {screenSizes.map(size => (
-                                            <button key={size} className={`btn-filter ${selectedScreenSize === size ? 'active' : ''}`} onClick={() => { setSelectedScreenSize(size); setCurrentPage(1); }}>
-                                                {size}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            {colors.length > 1 && (
-                                <div className="filter-group" style={{marginTop: '1rem'}}>
-                                    <label>Färg</label>
-                                    <div className="button-group">
-                                        {colors.map(color => (
-                                            <button key={color} className={`btn-filter ${selectedColor === color ? 'active' : ''}`} onClick={() => { setSelectedColor(color); setCurrentPage(1); }}>
-                                                {color}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
                         <div className="table-container" style={{overflowX: 'auto'}}>
@@ -299,6 +276,29 @@ function PriceUploader() {
                                 <tbody>
                                     {paginatedData.map((row, index) => (
                                         <tr key={index} onClick={() => handleRowClick(row)} style={{ cursor: 'pointer' }}>
+                                            <td>{row['Part Number']}</td>
+                                            <td>{row['Description']}</td>
+                                            <td>{row['ALP Ex VAT']}</td>
+                                            <td>{row['ALP Inc VAT']}</td>
+                                            <td>{row['NPI']}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style={{marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                             <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                             <span>Visar {paginatedData.length} av {filteredData.length} produkter</span>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<PriceUploader />);
                                             <td>{row['Part Number']}</td>
                                             <td>{row['Description']}</td>
                                             <td>{row['ALP Ex VAT']}</td>

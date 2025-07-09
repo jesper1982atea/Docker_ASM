@@ -54,6 +54,32 @@ def find_header_row(df):
             continue # Ignore rows that cause errors
     return None
 
+def normalize_columns(df):
+    """Normalize column names to a consistent format for robust parsing."""
+    new_columns = {}
+    # A map of possible column names (and parts of them) to our desired standard name.
+    column_map = {
+        'part number': 'Part Number',
+        'description': 'Description',
+        'alp ex vat': 'ALP Ex VAT',
+        'alp inc vat': 'ALP Inc VAT',
+        'category': 'Category',
+        'npi': 'NPI'
+    }
+    for col in df.columns:
+        normalized_col = str(col).lower().strip()
+        found = False
+        for key, value in column_map.items():
+            if key in normalized_col:
+                new_columns[col] = value
+                found = True
+                break
+        if not found:
+            new_columns[col] = str(col).strip()
+            
+    df.rename(columns=new_columns, inplace=True)
+    return df
+
 def parse_price_excel(file_stream):
     """
     Parses an Excel file stream from Apple's price list by dynamically finding the header row.
@@ -74,7 +100,7 @@ def parse_price_excel(file_stream):
         df = pd.read_excel(file_stream, header=header_row_index)
         
         # Normalize column names for consistency
-        df.columns = [str(col).strip() for col in df.columns]
+        df = normalize_columns(df)
         
         # Check for essential columns
         required_cols = ['Part Number', 'Description', 'ALP Ex VAT']
@@ -102,21 +128,4 @@ def parse_price_excel(file_stream):
 
     except Exception as e:
         logger.error(f"Error parsing price excel file: {e}", exc_info=True)
-        return None, str(e)
-        # Fill NaN with a placeholder for easier processing
-        df.fillna('', inplace=True)
-
-        data = df.to_dict('records')
-        
-        processed_data = []
-        for row in data:
-            # Parse description to get more details
-            description_details = parse_product_description(row.get('Description', ''))
-            row.update(description_details)
-            processed_data.append(row)
-
-        return processed_data, None
-
-    except Exception as e:
-        logger.error(f"Error parsing price excel file: {e}")
         return None, str(e)
