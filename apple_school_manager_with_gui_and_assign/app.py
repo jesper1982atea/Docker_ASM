@@ -6,6 +6,7 @@ import json
 from asmapp.asmapi import AppleSchoolManagerAPI
 from gsxapp.applegsx import AppleGSXAPI
 from asmapp.sales_parser import parse_sales_excel # Import the new parser
+from asmapp.price_parser import parse_price_excel # Import the price parser
 import copy
 import shutil
 import logging
@@ -334,6 +335,31 @@ class SalesUpload(Resource):
 api.add_namespace(sales_ns, path='/api/sales')
 # --- End of New Sales API Namespace ---
 
+# --- New Price List API Namespace ---
+price_ns = Namespace('price', description='Apple Price List Data Endpoints')
+
+@price_ns.route('/upload')
+class PriceUpload(Resource):
+    def post(self):
+        """Parses an uploaded Apple price list Excel file."""
+        if 'file' not in request.files:
+            return {'error': 'No file part in the request'}, 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return {'error': 'No file selected for uploading'}, 400
+
+        if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+            data, error = parse_price_excel(file.stream)
+            if error:
+                return {'error': f'Failed to parse file: {error}'}, 500
+            return jsonify(data)
+        else:
+            return {'error': 'Invalid file type, please upload an Excel file (.xlsx or .xls)'}, 400
+
+api.add_namespace(price_ns, path='/api/price')
+# --- End of New Price List API Namespace ---
+
 
 @api.route("/customers")
 @api.route("/api/customers")
@@ -595,6 +621,16 @@ def sales_order_detail_page():
 def sales_upload_page():
     """Serve the sales upload page"""
     return send_from_directory(FRONTEND_DIR, "sales-upload.html")
+
+@app.route("/price-upload")
+def price_upload_page():
+    """Serve the price list upload page"""
+    return send_from_directory(FRONTEND_DIR, "price-upload.html")
+
+@app.route("/price-detail")
+def price_detail_page():
+    """Serve the price detail page"""
+    return send_from_directory(FRONTEND_DIR, "price-detail.html")
 
 @customer_ns.route('/<string:customer_id>/orgDeviceActivities/unassign')
 class OrgDeviceActivitiesUnassign(Resource):
