@@ -7,7 +7,7 @@ from asmapp.asmapi import AppleSchoolManagerAPI
 from gsxapp.applegsx import AppleGSXAPI
 from asmapp.sales_parser import parse_sales_excel # Import the new parser
 from asmapp.price_parser import parse_price_excel # Import the price parser
-from asmapp.discount_parser import parse_discount_excel, save_discount_program_from_json # Import the discount parser
+from asmapp.discount_parser import parse_discount_excel # Import the discount parser
 import asmapp.discount_handler as discount_handler # Import the discount handler
 import copy
 import shutil
@@ -17,6 +17,7 @@ import requests
 import threading
 import datetime
 from werkzeug.utils import secure_filename
+from urllib.parse import unquote
 
 # Configure logging
 logging.basicConfig(
@@ -460,35 +461,62 @@ class FunctionalDiscounts(Resource):
 class DiscountUpload(Resource):
     def post(self):
         """
-        Processes a new discount program from a JSON payload.
+        Parses an uploaded discount program Excel file and saves it as JSON.
         """
-        if not request.is_json:
-            return {"error": "Request must be JSON"}, 400
-
-        request_data = request.get_json()
+        if 'file' not in request.files:
+            return {'error': 'No file part in the request'}, 400
         
-        # Use the directory managed by the discount_handler
-        discounts_dir = discount_handler.DISCOUNTS_DIR
+        file = request.files['file']
+        if file.filename == '':
+            return {'error': 'No file selected for uploading'}, 400
+
+        if not (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+            return {'error': 'Invalid file type, please upload an Excel file (.xlsx or .xls)'}, 400
         
-        success, message = save_discount_program_from_json(request_data, discounts_dir)
+        try:
+            program_name, data, error = parse_discount_excel(file.stream)
+            
+            if error:
+                logger.error(f"Failed to parse discount file {file.filename}: {error}")
+                return {'error': f'Failed to parse file: {error}'}, 400
+            
+            if not program_name or not data:
+                logger.error(f"Parsing discount file {file.filename} resulted in no data.")
+                return {'error': 'Could not extract program name or data from the file.'}, 400
 
-        if success:
-            return {"message": message}, 201 # 201 for resource created
-        else:
-            return {"error": message}, 400
+            # Save the parsed data
+            discounts_dir = discount_handler.DISCOUNTS_DIR
+            safe_filename = "".join(c for c in program_name if c.isalnum() or c in (' ', '_', '-')).rstrip()
+            filepath = os.path.join(discounts_dir, f"{safe_filename}.json")
 
-@discount_ns.route('/<string:program_name>')
+            os.makedirs(discounts_dir, exist_ok=True)
+
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+            
+            logger.info(f"Successfully saved discount program '{program_name}' to {filepath}")
+            return {'message': f"Program '{program_name}' saved successfully."}, 201
+
+        except Exception as e:
+            logger.error(f"Error during discount file upload and processing: {e}", exc_info=True)
+            return {'error': 'An internal error occurred while processing the file.'}, 500
+
+@discount_ns.route('/<path:program_name>')
 class DiscountFile(Resource):
     def get(self, program_name):
         """Gets the parsed data from a specific discount program."""
-        data, error = discount_handler.get_discount_data(program_name)
+        # Explicitly decode the program name from the URL
+        decoded_program_name = unquote(program_name)
+        data, error = discount_handler.get_discount_data(decoded_program_name)
         if error:
             return {'error': error}, 404
         return jsonify(data)
 
     def delete(self, program_name):
         """Deletes a discount program."""
-        success, error = discount_handler.delete_discount_file(program_name)
+        # Explicitly decode the program name from the URL
+        decoded_program_name = unquote(program_name)
+        success, error = discount_handler.delete_discount_file(decoded_program_name)
         if error:
             return {'error': error}, 404
         return {'status': 'deleted'}, 200

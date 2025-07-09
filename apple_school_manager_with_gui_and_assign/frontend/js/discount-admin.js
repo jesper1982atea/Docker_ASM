@@ -123,31 +123,26 @@ function DiscountAdminPage() {
     };
 
     const handleUpload = async () => {
-        if (!previewData || !programName) {
-            setError('Välj en fil och se till att programnamnet är ifyllt.');
+        if (!file) {
+            setError('Välj en fil att ladda upp.');
             return;
         }
 
         setUploading(true);
         setError('');
 
-        const payload = {
-            program_name: programName,
-            data: previewData
-        };
+        const formData = new FormData();
+        formData.append('file', file);
 
-        console.log("DEBUG: Skickar följande payload till /api/discounts/upload:", JSON.stringify(payload, null, 2));
+        console.log("DEBUG: Skickar fil till /api/discounts/upload:", file.name);
 
         try {
             const response = await fetch('/api/discounts/upload', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
+                body: formData,
             });
             if (!response.ok) {
-                let errorText = 'Kunde inte spara programmet.';
+                let errorText = 'Kunde inte ladda upp och spara programmet.';
                 // Read the response body once as text to avoid "Body is disturbed" error.
                 const responseText = await response.text();
                 try {
@@ -168,8 +163,8 @@ function DiscountAdminPage() {
             fetchDiscounts();
             alert('Rabattprogrammet har laddats upp!');
         } catch (err) {
-            console.error("FEL vid spara:", err);
-            setError(`Ett fel uppstod vid spara: ${err.message}`);
+            console.error("FEL vid uppladdning:", err);
+            setError(`Ett fel uppstod vid uppladdning: ${err.message}`);
         } finally {
             setUploading(false);
         }
@@ -180,7 +175,9 @@ function DiscountAdminPage() {
             return;
         }
         try {
-            const response = await fetch(`/api/discounts/${programNameToDelete}`, {
+            // Encode the program name to handle special characters in the URL
+            const encodedProgramName = encodeURIComponent(programNameToDelete);
+            const response = await fetch(`/api/discounts/${encodedProgramName}`, {
                 method: 'DELETE',
             });
             if (!response.ok) {
@@ -199,7 +196,9 @@ function DiscountAdminPage() {
         setViewedProgramName(programName);
         setError('');
         try {
-            const res = await fetch(`/api/discounts/${programName}`);
+            // Encode the program name to handle special characters in the URL
+            const encodedProgramName = encodeURIComponent(programName);
+            const res = await fetch(`/api/discounts/${encodedProgramName}`);
             if (!res.ok) {
                 const errData = await res.json();
                 throw new Error(errData.error || `Kunde inte hämta programmet ${programName}`);
@@ -452,6 +451,7 @@ function DiscountAdminPage() {
 const domContainer = document.getElementById('root');
 const root = ReactDOM.createRoot(domContainer);
 root.render(<DiscountAdminPage />);
+
 
 
 
