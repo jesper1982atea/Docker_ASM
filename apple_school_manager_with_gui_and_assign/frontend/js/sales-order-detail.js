@@ -80,6 +80,16 @@ function SalesOrderDetailPage() {
     const [discountMap, setDiscountMap] = useState(new Map());
     const [discountLoading, setDiscountLoading] = useState(false);
 
+    const productDetailData = useMemo(() => {
+        if (!priceInfo || !orderData) return null;
+        return {
+            'Part Number': orderData['Artikelnr (tillverkare)'],
+            'Description': orderData['Artikelbenämning (APA)'],
+            'Category': priceInfo.category,
+            // Add other fields if they become available in orderData or priceInfo
+        };
+    }, [orderData, priceInfo]);
+
     useEffect(() => {
         // Parse order data from URL
         const params = new URLSearchParams(window.location.search);
@@ -327,16 +337,6 @@ function SalesOrderDetailPage() {
     }
 
     const serialNumber = orderData['Serienr'];
-
-    const productDetailData = useMemo(() => {
-        if (!priceInfo || !orderData) return null;
-        return {
-            'Part Number': orderData['Artikelnr (tillverkare)'],
-            'Description': orderData['Artikelbenämning (APA)'],
-            'Category': priceInfo.category,
-            // Add other fields if they become available in orderData or priceInfo
-        };
-    }, [orderData, priceInfo]);
 
     return (
         <div className="container">

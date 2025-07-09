@@ -265,6 +265,9 @@ function GsxDeviceDetailsPage() {
     );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<GsxDeviceDetailsPage />);
+// Only render this page if we are on gsx-device-details.html
+if (window.location.pathname.includes('gsx-device-details.html')) {
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<GsxDeviceDetailsPage />);
+}
 
