@@ -1,7 +1,8 @@
-flask
-flask-restx
+Flask
+Flask-RESTX
+Flask-Cors
+requests
 authlib
 pycryptodome
-requests
-flask_cors
-pydantic
+pandas
+openpyxl
