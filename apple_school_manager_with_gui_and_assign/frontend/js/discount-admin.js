@@ -64,8 +64,9 @@ function DiscountAdminPage() {
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
                 
-                // Konvertera kalkylblad till JSON, med rubriker från rad 3 (index 2)
-                let json = XLSX.utils.sheet_to_json(worksheet, { header: 2 });
+                // Explicitly skip the first two rows and use the third row (index 2) as the header.
+                // The `range` option tells the parser where to start reading data from.
+                const json = XLSX.utils.sheet_to_json(worksheet, { range: 2 });
 
                 // Helper to trim whitespace from object keys
                 const trimKeys = (arr) => arr.map(obj => 
@@ -75,18 +76,18 @@ function DiscountAdminPage() {
                     }, {})
                 );
 
-                json = trimKeys(json);
-                setRawPreviewData(json); // Save raw data for debugging view
+                const cleanedJson = trimKeys(json);
+                setRawPreviewData(cleanedJson); // Save raw data for debugging view
 
-                if (json.length > 0) {
-                    console.log("DEBUG: Kolumnnamn som hittades i första raden:", Object.keys(json[0]));
+                if (cleanedJson.length > 0) {
+                    console.log("DEBUG: Kolumnnamn som hittades i första raden:", Object.keys(cleanedJson[0]));
                 }
 
                 // Hämta programnamnet från första raden med data
-                const programNameFromFile = json.length > 0 && json[0]['Program Name'] ? json[0]['Program Name'] : f.name.replace(/\.(xlsx|xls)$/, '');
+                const programNameFromFile = cleanedJson.length > 0 && cleanedJson[0]['Program Name'] ? cleanedJson[0]['Program Name'] : f.name.replace(/\.(xlsx|xls)$/, '');
                 setProgramName(programNameFromFile);
 
-                const sanitizedData = json
+                const sanitizedData = cleanedJson
                     .filter(row => row['Product Class'] && row['Rebate Rate (%)'] !== undefined)
                     .map(row => {
                         let rate = row['Rebate Rate (%)'];
@@ -104,7 +105,7 @@ function DiscountAdminPage() {
 
                 setPreviewData(sanitizedData);
 
-                if (sanitizedData.length === 0 && json.length > 0) {
+                if (sanitizedData.length === 0 && cleanedJson.length > 0) {
                     setError("Filen lästes in, men inga giltiga rader med både 'Product Class' och 'Rebate Rate (%)' hittades. Granska rådatan nedan för att verifiera kolumnrubriker och innehåll.");
                 }
 
