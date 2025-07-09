@@ -18,12 +18,19 @@ def list_discounts():
     except FileNotFoundError:
         return []
 
-def save_discount_file(file):
+def save_discount_file(file, program_name=None):
     """Saves an uploaded discount file."""
     if not file or not file.filename:
         return None, "No file provided"
     
-    filename = secure_filename(file.filename)
+    if program_name:
+        # Get the file extension from the original filename
+        _, extension = os.path.splitext(file.filename)
+        # Sanitize program_name to be a valid filename and add extension
+        filename = f"{secure_filename(program_name)}{extension}"
+    else:
+        filename = secure_filename(file.filename)
+    
     filepath = os.path.join(DISCOUNTS_DIR, filename)
     file.save(filepath)
     logger.info(f"Saved discount file: {filename}")
@@ -49,10 +56,20 @@ def get_discount_data(filename):
         
     try:
         # Assuming columns are 'Part Number' and 'Discount' (e.g., 5 for 5%)
-        df = pd.read_excel(filepath)
+        # Updated to handle the new format
+        df = pd.read_excel(filepath, header=2)
+        df.rename(columns={
+            'Product Nr./CID Nr.': 'Part Number',
+            'Rebate Rate (%)': 'Discount'
+        }, inplace=True)
+
         df.dropna(subset=['Part Number', 'Discount'], inplace=True)
         
         # Convert to a dictionary {part_number: discount_decimal}
+        # Ensure discount is treated as a number, handling potential errors
+        df['Discount'] = pd.to_numeric(df['Discount'], errors='coerce')
+        df.dropna(subset=['Discount'], inplace=True)
+
         discount_map = pd.Series(df.Discount.values / 100, index=df['Part Number']).to_dict()
         return discount_map, None
     except Exception as e:

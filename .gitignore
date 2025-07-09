@@ -1,6 +1,6 @@
 # Ignore sensitive data and local configurations
-admin_api/customers/
-admin_api/discounts/
+apple_school_manager_with_gui_and_assign/admin_api/customers/
+apple_school_manager_with_gui_and_assign/admin_api/discounts/
 
 # Python cache
 __pycache__/
