@@ -143,11 +143,15 @@ function DiscountAdminPage() {
             });
             if (!response.ok) {
                 let errorText = 'Kunde inte spara programmet.';
+                // Read the response body once as text to avoid "Body is disturbed" error.
+                const responseText = await response.text();
                 try {
-                    const errData = await response.json();
+                    // Try to parse the text as JSON.
+                    const errData = JSON.parse(responseText);
                     errorText = errData.error || JSON.stringify(errData);
                 } catch (e) {
-                    errorText = await response.text();
+                    // If parsing fails, the error is likely plain text.
+                    errorText = responseText;
                 }
                 throw new Error(errorText);
             }
