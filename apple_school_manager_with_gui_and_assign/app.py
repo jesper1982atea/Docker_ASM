@@ -391,7 +391,7 @@ class PriceUpload(Resource):
 
         if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
             try:
-                # --- Save Raw File ---
+                # --- Save Raw File with a unique name ---
                 today = datetime.date.today().strftime("%Y-%m-%d")
                 original_filename = secure_filename(file.filename)
                 filename_base, file_extension = os.path.splitext(original_filename)
@@ -401,14 +401,16 @@ class PriceUpload(Resource):
                 file.save(save_path)
                 logger.info(f"Saved raw price file to {save_path}")
 
-                # --- Process and Save JSON from the saved file ---
+                # --- Process the newly saved file from disk ---
                 with open(save_path, 'rb') as saved_file:
                     data, error = parse_price_excel(saved_file)
                 
                 if error:
-                    logger.error(f"Failed to parse uploaded file {new_raw_filename}: {error}")
+                    # Log with the correct filename that was actually parsed
+                    logger.error(f"Failed to parse saved file {new_raw_filename}: {error}")
                     return {'error': f'Failed to parse file: {error}'}, 500
                 
+                # --- Save Processed JSON ---
                 json_filename = f"{filename_base}_{today}.json"
                 json_filepath = os.path.join(PROCESSED_PRICE_DIR, json_filename)
                 
