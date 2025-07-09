@@ -1,16 +1,92 @@
 const { useState, useEffect } = React;
 
+function Pagination({ currentPage, totalPages, onPageChange }) {
+    if (totalPages <= 1) {
+        return null;
+    }
+
+    const handlePageClick = (page) => {
+        if (page >= 1 && page <= totalPages) {
+            onPageChange(page);
+        }
+    };
+
+    const pageNumbers = [];
+    const maxPagesToShow = 5;
+    let startPage, endPage;
+
+    if (totalPages <= maxPagesToShow) {
+        startPage = 1;
+        endPage = totalPages;
+    } else {
+        if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+            startPage = 1;
+            endPage = maxPagesToShow;
+        } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+            startPage = totalPages - maxPagesToShow + 1;
+            endPage = totalPages;
+        } else {
+            startPage = currentPage - Math.floor(maxPagesToShow / 2);
+            endPage = currentPage + Math.floor(maxPagesToShow / 2);
+        }
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+    }
+
+    return (
+        <nav className="pagination">
+            <button onClick={() => handlePageClick(currentPage - 1)} disabled={currentPage === 1}>
+                &laquo; Föregående
+            </button>
+            
+            {startPage > 1 && (
+                <React.Fragment>
+                    <button onClick={() => handlePageClick(1)}>1</button>
+                    {startPage > 2 && <span className="page-ellipsis">...</span>}
+                </React.Fragment>
+            )}
+
+            {pageNumbers.map(number => (
+                <button 
+                    key={number} 
+                    onClick={() => handlePageClick(number)} 
+                    className={currentPage === number ? 'active' : ''}
+                >
+                    {number}
+                </button>
+            ))}
+
+            {endPage < totalPages && (
+                <React.Fragment>
+                    {endPage < totalPages - 1 && <span className="page-ellipsis">...</span>}
+                    <button onClick={() => handlePageClick(totalPages)}>{totalPages}</button>
+                </React.Fragment>
+            )}
+
+            <button onClick={() => handlePageClick(currentPage + 1)} disabled={currentPage === totalPages}>
+                Nästa &raquo;
+            </button>
+        </nav>
+    );
+}
+
+
 function SalesUploader() {
     const [file, setFile] = useState(null);
     const [data, setData] = useState(null);
     const [headers, setHeaders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
 
     const handleFileChange = (event) => {
         setFile(event.target.files[0]);
         setData(null);
         setError('');
+        setCurrentPage(1);
     };
 
     const handleUpload = async () => {
@@ -22,6 +98,7 @@ function SalesUploader() {
         setLoading(true);
         setError('');
         setData(null);
+        setCurrentPage(1);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -52,6 +129,9 @@ function SalesUploader() {
         }
     };
 
+    const totalPages = data ? Math.ceil(data.length / itemsPerPage) : 0;
+    const paginatedData = data ? data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) : [];
+
     return (
         <div className="container" style={{ maxWidth: '95%', margin: '2rem auto' }}>
             <header className="atea-header">
@@ -78,11 +158,18 @@ function SalesUploader() {
                     {error && <p style={{ color: 'var(--atea-red)', marginTop: '1rem' }}>{error}</p>}
                 </div>
 
-                {loading && <p style={{ marginTop: '2rem', textAlign: 'center' }}>Läser filen...</p>}
+                {loading && <div className="loading" style={{marginTop: '2rem'}}><div className="spinner"></div><p>Läser filen...</p></div>}
 
                 {data && (
                     <div className="card" style={{ marginTop: '2rem', overflowX: 'auto' }}>
-                        <h3 style={{ padding: '1rem' }}>Granska data ({data.length} rader)</h3>
+                        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem'}}>
+                            <h3>Granska data ({data.length} rader)</h3>
+                            <Pagination 
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                            />
+                        </div>
                         <table className="table">
                             <thead>
                                 <tr>
@@ -90,13 +177,20 @@ function SalesUploader() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {data.map((row, index) => (
+                                {paginatedData.map((row, index) => (
                                     <tr key={index}>
                                         {headers.map(header => <td key={`${index}-${header}`}>{row[header]}</td>)}
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                         <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem'}}>
+                            <Pagination 
+                                currentPage={currentPage}
+                                totalPages={totalPages}
+                                onPageChange={setCurrentPage}
+                            />
+                        </div>
                     </div>
                 )}
             </main>
