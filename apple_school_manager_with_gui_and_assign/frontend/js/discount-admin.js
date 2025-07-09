@@ -6,6 +6,8 @@ function DiscountAdminPage() {
     const [error, setError] = useState('');
     const [file, setFile] = useState(null);
     const [uploading, setUploading] = useState(false);
+    const [previewData, setPreviewData] = useState(null);
+    const [programName, setProgramName] = useState('');
 
     const fetchDiscounts = async () => {
         try {
@@ -26,18 +28,62 @@ function DiscountAdminPage() {
     }, []);
 
     const handleFileChange = (event) => {
-        setFile(event.target.files[0]);
+        const selectedFile = event.target.files[0];
+        if (!selectedFile) {
+            setPreviewData(null);
+            setProgramName('');
+            setFile(null);
+            return;
+        }
+        setFile(selectedFile);
+        setError('');
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                // Headers are on row 3, so we skip the first 2 rows (index 0, 1)
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 2 });
+
+                if (jsonData.length === 0) {
+                    setError("The selected file is empty or has an invalid format.");
+                    setPreviewData(null);
+                    return;
+                }
+
+                const firstRow = jsonData[0];
+                const progName = firstRow['Program Name'];
+                if (!progName) {
+                    setError("Could not find 'Program Name' column in the file.");
+                    setPreviewData(null);
+                    return;
+                }
+                
+                setProgramName(progName);
+                setPreviewData(jsonData);
+
+            } catch (err) {
+                console.error("File parsing error:", err);
+                setError("Failed to parse the Excel file. Please ensure it's a valid format.");
+                setPreviewData(null);
+            }
+        };
+        reader.readAsArrayBuffer(selectedFile);
     };
 
     const handleUpload = async () => {
-        if (!file) {
-            setError('Please select a file to upload.');
+        if (!file || !programName) {
+            setError('Please select a valid file with a Program Name.');
             return;
         }
         setUploading(true);
         setError('');
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('program_name', programName);
 
         try {
             const response = await fetch('/api/discounts/upload', {
@@ -51,6 +97,8 @@ function DiscountAdminPage() {
             // Refresh list after upload
             fetchDiscounts();
             setFile(null); // Clear file input
+            setPreviewData(null);
+            setProgramName('');
             document.getElementById('file-upload').value = null;
         } catch (err) {
             setError(err.message);
@@ -92,15 +140,43 @@ function DiscountAdminPage() {
             <main style={{ marginTop: '2rem' }}>
                 <div className="card" style={{ padding: '2rem' }}>
                     <h3>Ladda upp nytt rabattprogram</h3>
-                    <p>Filen måste vara i Excel-format med kolumnerna 'Part Number' och 'Discount'.</p>
+                    <p>Välj en Excel-fil för att förhandsgranska och ladda upp.</p>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
                         <input type="file" id="file-upload" accept=".xlsx, .xls" onChange={handleFileChange} />
-                        <button onClick={handleUpload} disabled={uploading || !file} className="btn btn-primary">
-                            {uploading ? 'Laddar upp...' : 'Ladda upp'}
-                        </button>
                     </div>
-                    {error && <p style={{ color: 'var(--atea-red)', marginTop: '1rem' }}>{error}</p>}
+                    {error && <p className="alert alert-danger" style={{ marginTop: '1rem' }}>{error}</p>}
                 </div>
+
+                {previewData && (
+                    <div className="card" style={{ marginTop: '2rem' }}>
+                        <h3>Förhandsgranskning: {programName}</h3>
+                        <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        <th>Product Nr./CID Nr.</th>
+                                        <th>Product Description</th>
+                                        <th>Rebate Rate (%)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {previewData.map((row, index) => (
+                                        <tr key={index}>
+                                            <td>{row['Product Nr./CID Nr.']}</td>
+                                            <td>{row['Product Description']}</td>
+                                            <td>{row['Rebate Rate (%)']}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+                            <button onClick={handleUpload} disabled={uploading} className="btn btn-primary">
+                                {uploading ? 'Sparar...' : `Spara program "${programName}"`}
+                            </button>
+                        </div>
+                    </div>
+                )}
 
                 <div className="card" style={{ marginTop: '2rem' }}>
                     <h3>Tillgängliga Rabattprogram</h3>

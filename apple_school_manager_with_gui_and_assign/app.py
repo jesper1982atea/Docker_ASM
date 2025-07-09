@@ -376,8 +376,17 @@ class DiscountUpload(Resource):
         """Uploads a new discount program file."""
         if 'file' not in request.files:
             return {'error': 'No file part'}, 400
+        
         file = request.files['file']
-        filename, error = discount_handler.save_discount_file(file)
+        program_name = request.form.get('program_name')
+
+        if not program_name:
+            # Fallback for old method or if name is not provided
+            filename, error = discount_handler.save_discount_file(file)
+        else:
+            # New method: save with program name
+            filename, error = discount_handler.save_discount_file(file, program_name)
+
         if error:
             return {'error': error}, 400
         return {'status': 'success', 'filename': filename}, 201
