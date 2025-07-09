@@ -43,66 +43,66 @@ def parse_product_description(description):
     return details
 
 def find_header_row(df):
-    """Find the row index of the header which contains 'Part Number'."""
-    for i in range(min(10, len(df))): # Check first 10 rows
-        row_values = [str(v).lower().replace(' ', '') for v in df.iloc[i].values]
-        if 'partnumber' in row_values:
-            return i
+    """Find the row index of the header which contains 'Part Number', searching up to 30 rows."""
+    for i in range(min(30, len(df))): # Increased search range to 30 rows
+        try:
+            row_values = [str(v).lower().replace(' ', '') for v in df.iloc[i].values]
+            if 'partnumber' in row_values:
+                logger.info(f"Header row found at index: {i}")
+                return i
+        except Exception:
+            continue # Ignore rows that cause errors
     return None
-
-def normalize_columns(df):
-    """Normalize column names to a consistent format."""
-    new_columns = {}
-    for col in df.columns:
-        normalized = str(col).lower().strip()
-        if 'part number' in normalized:
-            new_columns[col] = 'Part Number'
-        elif 'description' in normalized:
-            new_columns[col] = 'Description'
-        elif 'alp ex vat' in normalized:
-            new_columns[col] = 'ALP Ex VAT'
-        elif 'alp inc vat' in normalized:
-            new_columns[col] = 'ALP Inc VAT'
-        elif 'category' in normalized:
-            new_columns[col] = 'Category'
-        elif 'npi' in normalized:
-            new_columns[col] = 'NPI'
-        else:
-            new_columns[col] = str(col).strip()
-    df.rename(columns=new_columns, inplace=True)
-    return df
 
 def parse_price_excel(file_stream):
     """
-    Parses an Excel file stream from Apple's price list, extracts product details from description,
-    and returns a list of dictionaries. This version is more robust.
+    Parses an Excel file stream from Apple's price list by dynamically finding the header row.
     """
     try:
-        # Ensure stream is at the beginning
+        # Ensure stream is at the beginning for the first read
         file_stream.seek(0)
-        # Read without a header first to find it dynamically
+        
+        # Read without a header to find it dynamically
         df_no_header = pd.read_excel(file_stream, header=None)
         header_row_index = find_header_row(df_no_header)
 
         if header_row_index is None:
-            return None, "Could not find the header row. Ensure 'Part Number' column exists."
+            return None, "Could not find the header row. Ensure 'Part Number' column exists within the first 30 rows."
 
-        # Re-read the excel file with the correct header row
-        file_stream.seek(0) # Reset stream before reading again
+        # Reset stream and re-read the excel file with the correct header row
+        file_stream.seek(0)
         df = pd.read_excel(file_stream, header=header_row_index)
         
-        # Normalize column names
-        df = normalize_columns(df)
+        # Normalize column names for consistency
+        df.columns = [str(col).strip() for col in df.columns]
         
-        # Check for essential columns after normalization
+        # Check for essential columns
         required_cols = ['Part Number', 'Description', 'ALP Ex VAT']
         if not all(col in df.columns for col in required_cols):
-            logger.error(f"Missing required columns after normalization. Found: {list(df.columns)}")
+            logger.error(f"File is missing required columns after finding header. Found: {list(df.columns)}")
             return None, "File is missing required columns: 'Part Number', 'Description', 'ALP Ex VAT'."
 
-        # Drop rows where Part Number is missing
+        # Drop rows where Part Number is missing or is not a valid part number
         df.dropna(subset=['Part Number'], inplace=True)
+        df = df[df['Part Number'].str.contains(r'^[A-Z0-9/]+$', na=False)]
         
+        # Fill NaN with a placeholder for easier processing
+        df.fillna('', inplace=True)
+
+        data = df.to_dict('records')
+        
+        processed_data = []
+        for row in data:
+            # Parse description to get more details
+            description_details = parse_product_description(row.get('Description', ''))
+            row.update(description_details)
+            processed_data.append(row)
+
+        return processed_data, None
+
+    except Exception as e:
+        logger.error(f"Error parsing price excel file: {e}", exc_info=True)
+        return None, str(e)
         # Fill NaN with a placeholder for easier processing
         df.fillna('', inplace=True)
 
