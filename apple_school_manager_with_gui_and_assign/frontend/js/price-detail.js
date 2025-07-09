@@ -50,10 +50,13 @@ function PriceDetailPage() {
                     const data = await res.json();
                     setDiscountData(data);
                 } else {
+                    const errData = await res.json();
+                    setError(`Error loading discount: ${errData.error}`);
                     setDiscountData(null);
                 }
             } catch (err) {
                 console.error("Failed to fetch discount data", err);
+                setError("Failed to fetch discount data.");
                 setDiscountData(null);
             }
         };
@@ -74,9 +77,12 @@ function PriceDetailPage() {
     };
 
     const basePrice = parseFloat(String(productData['ALP Ex VAT']).replace(',', '.')) || 0;
-    const productPartNumber = productData['Part Number'];
-    const appliedDiscountPercent = (discountData && discountData[productPartNumber]) ? discountData[productPartNumber] * 100 : 0;
-    const discountedBasePrice = basePrice * (1 - (appliedDiscountPercent / 100));
+    const productCategory = productData['Category'];
+    
+    // New discount logic: Match productData.Category with discountData[ProductClass]
+    const appliedDiscountRate = (discountData && productCategory && discountData[productCategory]) ? discountData[productCategory] : 0;
+    const discountedBasePrice = basePrice * (1 - appliedDiscountRate);
+    const appliedDiscountPercent = appliedDiscountRate * 100;
 
     const handleCustomerPriceChange = (e) => {
         const newPriceStr = e.target.value;
@@ -212,12 +218,14 @@ function PriceDetailPage() {
                             </div>
                             <div className="price-item">
                                 <label>Inköpspris (ALP Ex. moms)</label>
-                                <div className="price-value">{formatNumber(basePrice)} kr</div>
+                                <div className="price-value" style={{ textDecoration: appliedDiscountRate > 0 ? 'line-through' : 'none' }}>
+                                    {formatNumber(basePrice)} kr
+                                </div>
                             </div>
-                            {appliedDiscountPercent > 0 && (
+                            {appliedDiscountRate > 0 && (
                                 <div className="price-item" style={{color: 'var(--atea-green)'}}>
-                                    <label>Rabatterat inköpspris ({appliedDiscountPercent.toFixed(2)}%)</label>
-                                    <div className="price-value">{formatNumber(discountedBasePrice)} kr</div>
+                                    <label>Rabatterat inköpspris ({appliedDiscountPercent.toFixed(2)}% rabatt på kategori '{productCategory}')</label>
+                                    <div className="price-value" style={{fontWeight: 'bold'}}>{formatNumber(discountedBasePrice)} kr</div>
                                 </div>
                             )}
                             
