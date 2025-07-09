@@ -148,6 +148,12 @@ function PriceDetailPage() {
                         </div>
                     )}
                 </div>
+
+                {/* --- New Price Calculator --- */}
+                <div className="card" style={{ padding: '2rem', marginTop: '2rem' }}>
+                    <h3 style={{ margin: 0, marginBottom: '1.5rem' }}>Priskalkylator</h3>
+                    <window.PriceCalculator listPrice={alpExVat} discountRate={rebateRate} />
+                </div>
             </main>
         </div>
     );
