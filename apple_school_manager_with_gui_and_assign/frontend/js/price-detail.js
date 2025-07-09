@@ -5,6 +5,9 @@ function PriceDetailPage() {
     const [error, setError] = useState('');
     const [customerPrice, setCustomerPrice] = useState('');
     const [marginPercent, setMarginPercent] = useState('');
+    const [discounts, setDiscounts] = useState([]);
+    const [selectedDiscount, setSelectedDiscount] = useState('');
+    const [discountData, setDiscountData] = useState(null);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -19,7 +22,43 @@ function PriceDetailPage() {
         } else {
             setError('No product data provided in URL.');
         }
+
+        // Fetch available discount programs
+        const fetchDiscounts = async () => {
+            try {
+                const res = await fetch('/api/discounts');
+                if (res.ok) {
+                    const data = await res.json();
+                    setDiscounts(data);
+                }
+            } catch (err) {
+                console.error("Failed to fetch discounts", err);
+            }
+        };
+        fetchDiscounts();
     }, []);
+
+    useEffect(() => {
+        if (!selectedDiscount) {
+            setDiscountData(null);
+            return;
+        }
+        const fetchDiscountData = async () => {
+            try {
+                const res = await fetch(`/api/discounts/${selectedDiscount}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setDiscountData(data);
+                } else {
+                    setDiscountData(null);
+                }
+            } catch (err) {
+                console.error("Failed to fetch discount data", err);
+                setDiscountData(null);
+            }
+        };
+        fetchDiscountData();
+    }, [selectedDiscount]);
 
     if (error) {
         return <div className="container"><h1>{error}</h1></div>;
@@ -35,14 +74,17 @@ function PriceDetailPage() {
     };
 
     const basePrice = parseFloat(String(productData['ALP Ex VAT']).replace(',', '.')) || 0;
+    const productPartNumber = productData['Part Number'];
+    const appliedDiscountPercent = (discountData && discountData[productPartNumber]) ? discountData[productPartNumber] * 100 : 0;
+    const discountedBasePrice = basePrice * (1 - (appliedDiscountPercent / 100));
 
     const handleCustomerPriceChange = (e) => {
         const newPriceStr = e.target.value;
         setCustomerPrice(newPriceStr);
 
         const newPriceNum = parseFloat(String(newPriceStr).replace(',', '.')) || 0;
-        if (newPriceNum > 0 && basePrice > 0 && newPriceNum >= basePrice) {
-            const profit = newPriceNum - basePrice;
+        if (newPriceNum > 0 && discountedBasePrice > 0 && newPriceNum >= discountedBasePrice) {
+            const profit = newPriceNum - discountedBasePrice;
             const newMargin = (profit / newPriceNum) * 100;
             setMarginPercent(newMargin.toFixed(2));
         } else {
@@ -55,19 +97,19 @@ function PriceDetailPage() {
         setMarginPercent(newMarginStr);
 
         const newMarginNum = parseFloat(newMarginStr) || 0;
-        if (newMarginNum > 0 && newMarginNum < 100 && basePrice > 0) {
-            const newPrice = basePrice / (1 - (newMarginNum / 100));
+        if (newMarginNum > 0 && newMarginNum < 100 && discountedBasePrice > 0) {
+            const newPrice = discountedBasePrice / (1 - (newMarginNum / 100));
             setCustomerPrice(newPrice.toFixed(2));
         } else if (newMarginNum === 0) {
-            setCustomerPrice(basePrice.toFixed(2));
+            setCustomerPrice(discountedBasePrice.toFixed(2));
         } else {
             setCustomerPrice('');
         }
     };
 
     const customerPriceNum = parseFloat(String(customerPrice).replace(',', '.')) || 0;
-    const profitSEK = (customerPriceNum > 0 && basePrice > 0 && customerPriceNum >= basePrice) ? customerPriceNum - basePrice : 0;
-    const displayMargin = (customerPriceNum > 0 && basePrice > 0 && customerPriceNum >= basePrice) ? (profitSEK / customerPriceNum) * 100 : 0;
+    const profitSEK = (customerPriceNum > 0 && discountedBasePrice > 0 && customerPriceNum >= discountedBasePrice) ? customerPriceNum - discountedBasePrice : 0;
+    const displayMargin = (customerPriceNum > 0 && discountedBasePrice > 0 && customerPriceNum >= discountedBasePrice) ? (profitSEK / customerPriceNum) * 100 : 0;
 
     const renderValue = (value) => {
         if (typeof value === 'boolean') {
@@ -162,9 +204,22 @@ function PriceDetailPage() {
                         <div className="card">
                             <h3>Priskalkylator</h3>
                             <div className="price-item">
+                                <label>Välj rabattprogram</label>
+                                <select value={selectedDiscount} onChange={e => setSelectedDiscount(e.target.value)}>
+                                    <option value="">Inget rabattprogram</option>
+                                    {discounts.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                            </div>
+                            <div className="price-item">
                                 <label>Inköpspris (ALP Ex. moms)</label>
                                 <div className="price-value">{formatNumber(basePrice)} kr</div>
                             </div>
+                            {appliedDiscountPercent > 0 && (
+                                <div className="price-item" style={{color: 'var(--atea-green)'}}>
+                                    <label>Rabatterat inköpspris ({appliedDiscountPercent.toFixed(2)}%)</label>
+                                    <div className="price-value">{formatNumber(discountedBasePrice)} kr</div>
+                                </div>
+                            )}
                             
                             <div className="price-item">
                                 <label htmlFor="customer-price">Ange kundpris (Ex. moms)</label>

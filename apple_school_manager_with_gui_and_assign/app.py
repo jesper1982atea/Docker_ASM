@@ -7,6 +7,7 @@ from asmapp.asmapi import AppleSchoolManagerAPI
 from gsxapp.applegsx import AppleGSXAPI
 from asmapp.sales_parser import parse_sales_excel # Import the new parser
 from asmapp.price_parser import parse_price_excel # Import the price parser
+import asmapp.discount_handler as discount_handler # Import the discount handler
 import copy
 import shutil
 import logging
@@ -360,6 +361,46 @@ class PriceUpload(Resource):
 api.add_namespace(price_ns, path='/api/price')
 # --- End of New Price List API Namespace ---
 
+# --- New Discount API Namespace ---
+discount_ns = Namespace('discounts', description='Discount Program Endpoints')
+
+@discount_ns.route('/')
+class DiscountList(Resource):
+    def get(self):
+        """Lists all available discount programs."""
+        return jsonify(discount_handler.list_discounts())
+
+@discount_ns.route('/upload')
+class DiscountUpload(Resource):
+    def post(self):
+        """Uploads a new discount program file."""
+        if 'file' not in request.files:
+            return {'error': 'No file part'}, 400
+        file = request.files['file']
+        filename, error = discount_handler.save_discount_file(file)
+        if error:
+            return {'error': error}, 400
+        return {'status': 'success', 'filename': filename}, 201
+
+@discount_ns.route('/<string:filename>')
+class DiscountFile(Resource):
+    def get(self, filename):
+        """Gets the parsed data from a specific discount file."""
+        data, error = discount_handler.get_discount_data(filename)
+        if error:
+            return {'error': error}, 404
+        return jsonify(data)
+
+    def delete(self, filename):
+        """Deletes a discount file."""
+        success, error = discount_handler.delete_discount_file(filename)
+        if error:
+            return {'error': error}, 404
+        return {'status': 'deleted'}, 200
+
+api.add_namespace(discount_ns, path='/api/discounts')
+# --- End of New Discount API Namespace ---
+
 
 @api.route("/customers")
 @api.route("/api/customers")
@@ -632,6 +673,11 @@ def price_detail_page():
     """Serve the price detail page"""
     return send_from_directory(FRONTEND_DIR, "price-detail.html")
 
+@app.route("/discount-admin")
+def discount_admin_page():
+    """Serve the discount administration page"""
+    return send_from_directory(FRONTEND_DIR, "discount-admin.html")
+
 @customer_ns.route('/<string:customer_id>/orgDeviceActivities/unassign')
 class OrgDeviceActivitiesUnassign(Resource):
     def post(self, customer_id):
@@ -669,6 +715,9 @@ if __name__ == "__main__":
     # Ensure the customers directory exists
     if not os.path.exists(CUSTOMERS_DIR):
         os.makedirs(CUSTOMERS_DIR)
+    
+    # Ensure the discounts directory exists
+    discount_handler.setup_discounts_dir()
     
     # Run on port 6000 to match the expected port from curl
     app.run(host="0.0.0.0", port=6000, debug=True)

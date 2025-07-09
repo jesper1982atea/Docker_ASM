@@ -1,10 +1,10 @@
-# Customer data - contains sensitive PEM files and customer information
-customers/
-app/admin_api/customers/
+# Ignore sensitive data and local configurations
+admin_api/customers/
+admin_api/discounts/
 
-# Python
+# Python cache
 __pycache__/
-*.py[cod]
+*.pyc
 *$py.class
 *.so
 .Python
