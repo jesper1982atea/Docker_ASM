@@ -42,20 +42,62 @@ def parse_product_description(description):
 
     return details
 
+def find_header_row(df):
+    """Find the row index of the header which contains 'Part Number'."""
+    for i in range(min(10, len(df))): # Check first 10 rows
+        row_values = [str(v).lower().replace(' ', '') for v in df.iloc[i].values]
+        if 'partnumber' in row_values:
+            return i
+    return None
+
+def normalize_columns(df):
+    """Normalize column names to a consistent format."""
+    new_columns = {}
+    for col in df.columns:
+        normalized = str(col).lower().strip()
+        if 'part number' in normalized:
+            new_columns[col] = 'Part Number'
+        elif 'description' in normalized:
+            new_columns[col] = 'Description'
+        elif 'alp ex vat' in normalized:
+            new_columns[col] = 'ALP Ex VAT'
+        elif 'alp inc vat' in normalized:
+            new_columns[col] = 'ALP Inc VAT'
+        elif 'category' in normalized:
+            new_columns[col] = 'Category'
+        elif 'npi' in normalized:
+            new_columns[col] = 'NPI'
+        else:
+            new_columns[col] = str(col).strip()
+    df.rename(columns=new_columns, inplace=True)
+    return df
+
 def parse_price_excel(file_stream):
     """
     Parses an Excel file stream from Apple's price list, extracts product details from description,
-    and returns a list of dictionaries.
+    and returns a list of dictionaries. This version is more robust.
     """
     try:
-        df = pd.read_excel(file_stream, header=1) # Headers are on the second row (index 1)
+        # Ensure stream is at the beginning
+        file_stream.seek(0)
+        # Read without a header first to find it dynamically
+        df_no_header = pd.read_excel(file_stream, header=None)
+        header_row_index = find_header_row(df_no_header)
+
+        if header_row_index is None:
+            return None, "Could not find the header row. Ensure 'Part Number' column exists."
+
+        # Re-read the excel file with the correct header row
+        file_stream.seek(0) # Reset stream before reading again
+        df = pd.read_excel(file_stream, header=header_row_index)
         
-        # Rename columns for easier access, removing special characters
-        df.columns = df.columns.str.strip()
+        # Normalize column names
+        df = normalize_columns(df)
         
-        # Check for essential columns
+        # Check for essential columns after normalization
         required_cols = ['Part Number', 'Description', 'ALP Ex VAT']
         if not all(col in df.columns for col in required_cols):
+            logger.error(f"Missing required columns after normalization. Found: {list(df.columns)}")
             return None, "File is missing required columns: 'Part Number', 'Description', 'ALP Ex VAT'."
 
         # Drop rows where Part Number is missing
