@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useMemo } = React;
 
 function Pagination({ currentPage, totalPages, onPageChange }) {
     if (totalPages <= 1) {
@@ -76,7 +76,6 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
 function SalesUploader() {
     const [file, setFile] = useState(null);
     const [data, setData] = useState(null);
-    const [headers, setHeaders] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
@@ -85,6 +84,11 @@ function SalesUploader() {
     const [selectedCustomer, setSelectedCustomer] = useState('');
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
+
+    // New state for price list integration
+    const [priceLists, setPriceLists] = useState([]);
+    const [selectedPriceList, setSelectedPriceList] = useState('');
+    const [priceMap, setPriceMap] = useState(new Map());
 
     useEffect(() => {
         // Fetch customers with GSX keys
@@ -101,8 +105,47 @@ function SalesUploader() {
                 console.error("Failed to fetch customers", e);
             }
         };
+        // Fetch available price lists
+        const fetchPriceLists = async () => {
+            try {
+                const res = await fetch('/api/price/list');
+                if (!res.ok) throw new Error('Could not fetch price lists');
+                const files = await res.json();
+                setPriceLists(files);
+                if (files.length > 0) {
+                    setSelectedPriceList(files[0]); // Select the most recent one
+                }
+            } catch (e) {
+                console.error("Failed to fetch price lists", e);
+            }
+        };
         fetchCustomers();
+        fetchPriceLists();
     }, []);
+
+    // Effect to load the selected price list data and create a lookup map
+    useEffect(() => {
+        if (!selectedPriceList) {
+            setPriceMap(new Map());
+            return;
+        }
+        const loadPriceData = async () => {
+            try {
+                const res = await fetch(`/api/price/data/${selectedPriceList}`);
+                if (!res.ok) throw new Error(`Failed to load price data for ${selectedPriceList}`);
+                const priceData = await res.json();
+                const newPriceMap = new Map(priceData.map(item => [item['Part Number'], item['ALP Ex VAT']]));
+                setPriceMap(newPriceMap);
+                console.log(`Price map created with ${newPriceMap.size} entries.`);
+            } catch (e) {
+                console.error(e);
+                setError(`Error loading price list: ${e.message}`);
+                setPriceMap(new Map());
+            }
+        };
+        loadPriceData();
+    }, [selectedPriceList]);
+
 
     const handleFileChange = (event) => {
         setFile(event.target.files[0]);
@@ -139,7 +182,6 @@ function SalesUploader() {
             const result = await response.json();
             if (result && result.length > 0) {
                 setData(result);
-                setHeaders(Object.keys(result[0]));
             } else {
                 setError('No data found in the file or file is empty.');
             }
@@ -151,8 +193,32 @@ function SalesUploader() {
         }
     };
 
+    const augmentedData = useMemo(() => {
+        if (!data) return null;
+        if (priceMap.size === 0) return data;
+
+        return data.map(row => {
+            const partNumber = row['Artikelnr (tillverkare)'];
+            const alpPrice = priceMap.get(partNumber);
+            return {
+                ...row,
+                'ALP Ex VAT': alpPrice !== undefined ? alpPrice : 'N/A'
+            };
+        });
+    }, [data, priceMap]);
+
+    const headers = useMemo(() => {
+        if (!augmentedData || augmentedData.length === 0) return [];
+        const originalHeaders = Object.keys(augmentedData[0]).filter(h => h !== 'ALP Ex VAT');
+        const finalHeaders = [...originalHeaders];
+        if (priceMap.size > 0) {
+            finalHeaders.push('ALP Ex VAT');
+        }
+        return finalHeaders;
+    }, [augmentedData, priceMap]);
+
     const handleBulkExport = async () => {
-        if (!data || data.length === 0) {
+        if (!augmentedData || augmentedData.length === 0) {
             alert("Ingen data att exportera.");
             return;
         }
@@ -165,10 +231,10 @@ function SalesUploader() {
         setExportProgress(0);
     
         const exportData = [];
-        const totalRows = data.length;
+        const totalRows = augmentedData.length;
     
         for (let i = 0; i < totalRows; i++) {
-            const row = data[i];
+            const row = augmentedData[i];
             const serialNumber = row['Serienr'];
             let gsxData = {};
     
@@ -221,8 +287,8 @@ function SalesUploader() {
         window.location.href = `/sales-order-detail?data=${rowData}`;
     };
 
-    const totalPages = data ? Math.ceil(data.length / itemsPerPage) : 0;
-    const paginatedData = data ? data.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) : [];
+    const totalPages = augmentedData ? Math.ceil(augmentedData.length / itemsPerPage) : 0;
+    const paginatedData = augmentedData ? augmentedData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage) : [];
 
     return (
         <div className="container" style={{ maxWidth: '95%', margin: '2rem auto' }}>
@@ -250,36 +316,54 @@ function SalesUploader() {
                     {error && <p style={{ color: 'var(--atea-red)', marginTop: '1rem' }}>{error}</p>}
 
                     <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '2rem', paddingTop: '1.5rem' }}>
-                        <h4>Exportera med GSX-data</h4>
-                        <p>Välj en kund nedan för att berika exporten med GSX-information för varje serienummer.</p>
-                        <div className="form-group">
-                            <label>Välj kund för GSX-uppslag</label>
-                            <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} disabled={customers.length === 0 || isExporting}>
-                                {customers.length > 0 ? (
-                                    customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
-                                ) : (
-                                    <option>Inga kunder med GSX-nyckel</option>
+                        <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem'}}>
+                            <div>
+                                <h4>Exportera med GSX-data</h4>
+                                <p>Välj en kund nedan för att berika exporten med GSX-information.</p>
+                                <div className="form-group">
+                                    <label>Välj kund för GSX-uppslag</label>
+                                    <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} disabled={customers.length === 0 || isExporting}>
+                                        {customers.length > 0 ? (
+                                            customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                                        ) : (
+                                            <option>Inga kunder med GSX-nyckel</option>
+                                        )}
+                                    </select>
+                                </div>
+                                <br></br>
+                                <button onClick={handleBulkExport} disabled={!data || !selectedCustomer || isExporting} className="btn btn-success">
+                                    {isExporting ? `Exporterar... (${Math.round(exportProgress)}%)` : 'Exportera allt till Excel'}
+                                </button>
+                                {isExporting && (
+                                    <div className="progress-bar" style={{marginTop: '1rem'}}>
+                                        <div className="progress-bar-inner" style={{width: `${exportProgress}%`}}></div>
+                                    </div>
                                 )}
-                            </select>
-                        </div>
-                        <br></br>
-                        <button onClick={handleBulkExport} disabled={!data || !selectedCustomer || isExporting} className="btn btn-success">
-                            {isExporting ? `Exporterar... (${Math.round(exportProgress)}%)` : 'Exportera allt till Excel'}
-                        </button>
-                        {isExporting && (
-                            <div className="progress-bar" style={{marginTop: '1rem'}}>
-                                <div className="progress-bar-inner" style={{width: `${exportProgress}%`}}></div>
                             </div>
-                        )}
+                             <div>
+                                <h4>Prisuppslag</h4>
+                                <p>Välj en prislista för att se kostnadspris (ALP Ex VAT) för varje artikel.</p>
+                                <div className="form-group">
+                                    <label>Välj prislista</label>
+                                    <select value={selectedPriceList} onChange={e => setSelectedPriceList(e.target.value)} disabled={priceLists.length === 0}>
+                                        {priceLists.length > 0 ? (
+                                            priceLists.map(f => <option key={f} value={f}>{f}</option>)
+                                        ) : (
+                                            <option>Inga prislistor hittades</option>
+                                        )}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 {loading && <div className="loading" style={{marginTop: '2rem'}}><div className="spinner"></div><p>Läser filen...</p></div>}
 
-                {data && (
+                {augmentedData && (
                     <div className="card" style={{ marginTop: '2rem', overflowX: 'auto' }}>
                         <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem'}}>
-                            <h3>Granska data ({data.length} rader)</h3>
+                            <h3>Granska data ({augmentedData.length} rader)</h3>
                             <Pagination 
                                 currentPage={currentPage}
                                 totalPages={totalPages}
