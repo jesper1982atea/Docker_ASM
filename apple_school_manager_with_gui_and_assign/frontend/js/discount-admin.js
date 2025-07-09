@@ -200,5 +200,4 @@ function DiscountAdminPage() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<DiscountAdminPage />);
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<DiscountAdminPage />);
+
