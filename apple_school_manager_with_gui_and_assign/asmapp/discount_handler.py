@@ -1,16 +1,43 @@
 import os
 import json
-import pandas as pd
 import logging
 from werkzeug.utils import secure_filename
 
 logger = logging.getLogger(__name__)
 
 DISCOUNTS_DIR = os.path.join(os.path.dirname(__file__), '..', 'admin_api', 'discounts')
+FUNCTIONAL_DISCOUNTS_FILE = os.path.join(DISCOUNTS_DIR, 'functional_discounts.json')
 
 def setup_discounts_dir():
     if not os.path.exists(DISCOUNTS_DIR):
         os.makedirs(DISCOUNTS_DIR)
+
+# --- Functional Discounts ---
+
+def get_functional_discounts():
+    """Reads functional discounts from the dedicated JSON file."""
+    setup_discounts_dir()
+    if not os.path.exists(FUNCTIONAL_DISCOUNTS_FILE):
+        return []
+    try:
+        with open(FUNCTIONAL_DISCOUNTS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, IOError) as e:
+        logger.error(f"Error reading functional discounts file: {e}")
+        return []
+
+def save_functional_discounts(discounts_data):
+    """Saves the list of functional discounts to the dedicated JSON file."""
+    setup_discounts_dir()
+    try:
+        with open(FUNCTIONAL_DISCOUNTS_FILE, 'w', encoding='utf-8') as f:
+            json.dump(discounts_data, f, indent=2)
+        return None
+    except IOError as e:
+        logger.error(f"Error saving functional discounts file: {e}")
+        return f"Could not save functional discounts: {e}"
+
+# --- Program-specific Discounts ---
 
 def list_discounts():
     """Lists all available processed discount programs (JSON files)."""
@@ -83,8 +110,8 @@ def delete_discount_file(program_name):
         return False, "Could not delete discount file."
 
 
-def get_discount_data(program_name):
-    """Gets the content of a processed discount JSON file."""
+def _get_raw_discount_data(program_name):
+    """Gets the raw content of a specific discount program file, without modifications."""
     setup_discounts_dir()
     filename = secure_filename(program_name) + ".json"
     filepath = os.path.join(DISCOUNTS_DIR, filename)
@@ -96,7 +123,6 @@ def get_discount_data(program_name):
     try:
         with open(filepath, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        # Ensure the data is a list
         if isinstance(data, list):
             return data, None
         else:
@@ -105,4 +131,52 @@ def get_discount_data(program_name):
     except Exception as e:
         logger.error(f"Error reading discount file {filename}: {e}")
         return [], "Could not read or parse discount file."
+
+def get_discount_data(program_name):
+    """
+    Gets the content of a discount program and applies global functional discounts on top.
+    """
+    program_data, error = _get_raw_discount_data(program_name)
+    if error:
+        return [], error
+
+    functional_discounts = get_functional_discounts()
+    if not functional_discounts:
+        return program_data, None
+
+    functional_discount_map = {item['category']: float(item['discount']) for item in functional_discounts}
+
+    category_keywords = {
+        'Mac': ['mac', 'display'],
+        'iPad': ['ipad'],
+        'iPhone': ['iphone'],
+        'Watch': ['watch'],
+        'Accessories': ['magic', 'pencil', 'adapter', 'cable', 'airtag', 'airpods', 'beatsbydre', 'tv', 'homepod']
+    }
+    
+    product_class_to_category = {
+        keyword: category 
+        for category, keywords in category_keywords.items() 
+        for keyword in keywords
+    }
+
+    augmented_data = []
+    for row in program_data:
+        new_row = row.copy()
+        product_class = (new_row.get('Product Class') or '').lower()
+        
+        assigned_category = None
+        for keyword, category_name in product_class_to_category.items():
+            if keyword in product_class:
+                assigned_category = category_name
+                break
+        
+        if assigned_category and assigned_category in functional_discount_map:
+            functional_rebate = functional_discount_map[assigned_category]
+            original_rebate = float(new_row.get('Rebate Rate', 0))
+            new_row['Rebate Rate'] = original_rebate + functional_rebate
+        
+        augmented_data.append(new_row)
+            
+    return augmented_data, None
 

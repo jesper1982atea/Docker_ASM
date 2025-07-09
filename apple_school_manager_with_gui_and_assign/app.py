@@ -437,6 +437,24 @@ class DiscountList(Resource):
         """Lists all available discount programs."""
         return jsonify(discount_handler.list_discounts())
 
+@discount_ns.route('/functional')
+class FunctionalDiscounts(Resource):
+    def get(self):
+        """Gets the list of global functional discounts."""
+        return jsonify(discount_handler.get_functional_discounts())
+
+    def post(self):
+        """Saves the list of global functional discounts."""
+        discounts_data = request.get_json()
+        if not isinstance(discounts_data, list):
+            return {'error': 'Payload must be a list of discount objects'}, 400
+        
+        error = discount_handler.save_functional_discounts(discounts_data)
+        if error:
+            return {'error': error}, 500
+        
+        return {'status': 'success'}, 200
+
 @discount_ns.route('/upload')
 class DiscountUpload(Resource):
     def post(self):
