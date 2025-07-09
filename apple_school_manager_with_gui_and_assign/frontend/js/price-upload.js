@@ -59,6 +59,8 @@ function PriceUploader() {
     const [fileName, setFileName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('All');
+    const [selectedScreenSize, setSelectedScreenSize] = useState('All');
+    const [selectedColor, setSelectedColor] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
     const [processedFiles, setProcessedFiles] = useState([]);
@@ -150,11 +152,31 @@ function PriceUploader() {
         return ['All', ...uniqueCategories.filter(c => c && c !== 'Uncategorized').sort(), 'Uncategorized'];
     }, [data]);
 
+    const screenSizes = useMemo(() => {
+        if (!data) return [];
+        const uniqueSizes = [...new Set(data.map(item => item['Screen Size']))];
+        return ['All', ...uniqueSizes.filter(s => s && s !== 'N/A').sort()];
+    }, [data]);
+
+    const colors = useMemo(() => {
+        if (!data) return [];
+        const uniqueColors = [...new Set(data.map(item => item['Color']))];
+        return ['All', ...uniqueColors.filter(c => c).sort()];
+    }, [data]);
+
     const filteredData = useMemo(() => {
         let result = data;
 
         if (selectedCategory && selectedCategory !== 'All') {
             result = result.filter(row => row.Category === selectedCategory);
+        }
+
+        if (selectedScreenSize && selectedScreenSize !== 'All') {
+            result = result.filter(row => row['Screen Size'] === selectedScreenSize);
+        }
+
+        if (selectedColor && selectedColor !== 'All') {
+            result = result.filter(row => row['Color'] === selectedColor);
         }
 
         if (!searchTerm) return result;
@@ -163,7 +185,7 @@ function PriceUploader() {
                 String(value).toLowerCase().includes(searchTerm.toLowerCase())
             )
         );
-    }, [data, searchTerm, selectedCategory]);
+    }, [data, searchTerm, selectedCategory, selectedScreenSize, selectedColor]);
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -215,7 +237,7 @@ function PriceUploader() {
                 {data.length > 0 && (
                     <div style={{ marginTop: '2rem' }}>
                         <div className="filters" style={{padding: '1rem', marginBottom: '1rem'}}>
-                            <div className="filter-grid" style={{gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
+                            <div className="filter-grid" style={{gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem'}}>
                                 <div className="filter-group">
                                     <label htmlFor="search-term">Sök i tabellen</label>
                                     <input
@@ -237,6 +259,30 @@ function PriceUploader() {
                                     </select>
                                 </div>
                             </div>
+                            {screenSizes.length > 1 && (
+                                <div className="filter-group" style={{marginTop: '1rem'}}>
+                                    <label>Skärmstorlek</label>
+                                    <div className="button-group">
+                                        {screenSizes.map(size => (
+                                            <button key={size} className={`btn-filter ${selectedScreenSize === size ? 'active' : ''}`} onClick={() => { setSelectedScreenSize(size); setCurrentPage(1); }}>
+                                                {size}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            {colors.length > 1 && (
+                                <div className="filter-group" style={{marginTop: '1rem'}}>
+                                    <label>Färg</label>
+                                    <div className="button-group">
+                                        {colors.map(color => (
+                                            <button key={color} className={`btn-filter ${selectedColor === color ? 'active' : ''}`} onClick={() => { setSelectedColor(color); setCurrentPage(1); }}>
+                                                {color}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="table-container" style={{overflowX: 'auto'}}>
