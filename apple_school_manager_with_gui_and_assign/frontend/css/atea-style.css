@@ -316,17 +316,18 @@ body {
 
 /* Admin Index Specific */
 #customerList { list-style: none; padding: 0; margin: 0; }
-#customerList li { background: var(--atea-white); margin-bottom: 0.7rem; padding: 1rem; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-color); }
-#customerList b { color: var(--atea-green); font-weight: 600; }
+#customerList li { background: var(--atea-white); margin-bottom: 1rem; padding: 1.5rem; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-color); transition: box-shadow 0.2s; }
+#customerList li:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+#customerList b { color: var(--atea-green); font-weight: 600; font-size: 1.1rem; }
 .customer-actions { display: flex; gap: 0.7rem; }
 .customer-actions a {
     background: var(--atea-green);
     color: var(--atea-white);
     border: 1px solid var(--atea-green);
     border-radius: 5px;
-    padding: 0.3rem 0.7rem;
+    padding: 0.5rem 1rem;
     text-decoration: none;
-    font-size: 0.95rem;
+    font-size: 0.875rem;
     font-weight: 600;
     transition: background 0.2s, color 0.2s;
 }
@@ -334,11 +335,11 @@ body {
     background: var(--atea-green-light);
     border-color: var(--atea-green-light);
 }
-.action-link { background: var(--atea-green); color: var(--atea-white); border: 1px solid var(--atea-green); border-radius: 5px; padding: 0.3rem 0.7rem; text-decoration: none; font-size: 0.95rem; font-weight: 600; transition: background 0.2s, color 0.2s; }
+.action-link { background: var(--atea-green); color: var(--atea-white); border: 1px solid var(--atea-green); border-radius: 5px; padding: 0.5rem 1rem; text-decoration: none; font-size: 0.875rem; font-weight: 600; transition: background 0.2s, color 0.2s; }
 .action-link:hover { background: var(--atea-green-light); border-color: var(--atea-green-light); }
-.delete-btn { background: #e53935; color: #fff; border: none; border-radius: 5px; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
+.delete-btn { background: #e53935; color: #fff; border: none; border-radius: 5px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.875rem; transition: background 0.2s; }
 .delete-btn:hover { background: #b71c1c; }
-.edit-btn { background: #ff9800; color: #fff; border: none; border-radius: 5px; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
+.edit-btn { background: #ff9800; color: #fff; border: none; border-radius: 5px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.875rem; transition: background 0.2s; }
 .edit-btn:hover { background: #f57c00; }
 .token-status { font-size: 0.85rem; margin-top: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 4px; display: inline-block; }
 .token-valid { background: #d1fae5; color: #065f46; }
@@ -367,17 +368,18 @@ body {
 
 /* Admin Index Specific */
 #customerList { list-style: none; padding: 0; margin: 0; }
-#customerList li { background: var(--atea-white); margin-bottom: 0.7rem; padding: 1rem; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-color); }
-#customerList b { color: var(--atea-green); font-weight: 600; }
+#customerList li { background: var(--atea-white); margin-bottom: 1rem; padding: 1.5rem; border-radius: 8px; display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border-color); transition: box-shadow 0.2s; }
+#customerList li:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+#customerList b { color: var(--atea-green); font-weight: 600; font-size: 1.1rem; }
 .customer-actions { display: flex; gap: 0.7rem; }
 .customer-actions a {
     background: var(--atea-green);
     color: var(--atea-white);
     border: 1px solid var(--atea-green);
     border-radius: 5px;
-    padding: 0.3rem 0.7rem;
+    padding: 0.5rem 1rem;
     text-decoration: none;
-    font-size: 0.95rem;
+    font-size: 0.875rem;
     font-weight: 600;
     transition: background 0.2s, color 0.2s;
 }
@@ -385,11 +387,11 @@ body {
     background: var(--atea-green-light);
     border-color: var(--atea-green-light);
 }
-.action-link { background: var(--atea-green); color: var(--atea-white); border: 1px solid var(--atea-green); border-radius: 5px; padding: 0.3rem 0.7rem; text-decoration: none; font-size: 0.95rem; font-weight: 600; transition: background 0.2s, color 0.2s; }
+.action-link { background: var(--atea-green); color: var(--atea-white); border: 1px solid var(--atea-green); border-radius: 5px; padding: 0.5rem 1rem; text-decoration: none; font-size: 0.875rem; font-weight: 600; transition: background 0.2s, color 0.2s; }
 .action-link:hover { background: var(--atea-green-light); border-color: var(--atea-green-light); }
-.delete-btn { background: #e53935; color: #fff; border: none; border-radius: 5px; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
+.delete-btn { background: #e53935; color: #fff; border: none; border-radius: 5px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.875rem; transition: background 0.2s; }
 .delete-btn:hover { background: #b71c1c; }
-.edit-btn { background: #ff9800; color: #fff; border: none; border-radius: 5px; padding: 0.3rem 0.7rem; cursor: pointer; font-size: 0.95rem; transition: background 0.2s; }
+.edit-btn { background: #ff9800; color: #fff; border: none; border-radius: 5px; padding: 0.5rem 1rem; cursor: pointer; font-size: 0.875rem; transition: background 0.2s; }
 .edit-btn:hover { background: #f57c00; }
 .token-status { font-size: 0.85rem; margin-top: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 4px; display: inline-block; }
 .token-valid { background: #d1fae5; color: #065f46; }
