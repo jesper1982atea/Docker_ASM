@@ -28,8 +28,6 @@ def parse_discount_excel(file_stream):
     Parses an Excel file containing discount program data.
     The file is expected to have headers in row 3 (1-based index).
     
-    Expected headers: 'Product Class', 'Rebate Rate (%)', 'Program Name'
-    
     Returns:
         - program_name (str): The name of the discount program.
         - data (list): A list of dicts with 'Product Class' and 'Rebate Rate'.
@@ -52,6 +50,9 @@ def parse_discount_excel(file_stream):
             logger.error(f"Missing required columns. Found: {df.columns.tolist()}")
             return None, None, f"Missing required columns: {', '.join(missing)}"
 
+        # Drop rows where ALL columns are NaN (empty rows)
+        df.dropna(how='all', inplace=True)
+        
         # Drop rows where essential columns are empty
         initial_rows = len(df)
         df.dropna(subset=['Product Class', 'Rebate Rate (%)', 'Program Name'], inplace=True)
@@ -66,7 +67,7 @@ def parse_discount_excel(file_stream):
         program_names = df['Program Name'].unique()
         if len(program_names) > 1:
             logger.warning(f"Multiple program names found: {program_names}. Using the first one: '{program_names[0]}'.")
-        program_name = program_names[0]
+        program_name = str(program_names[0])
 
         # Apply the robust conversion function to create the final 'Rebate Rate'
         df['Rebate Rate'] = df['Rebate Rate (%)'].apply(_convert_rebate_rate)
