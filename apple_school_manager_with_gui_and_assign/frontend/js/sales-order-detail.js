@@ -448,7 +448,12 @@ function SalesOrderDetailPage() {
                         </p>
                         <window.PriceCalculator 
                             listPrice={priceInfo.cost} 
-                            discountRate={discountMap.get(priceInfo.category) || 0} 
+                            discountRate={discountMap.get(priceInfo.category) || 0}
+                            originalDeal={{
+                                sales: priceInfo.sales,
+                                margin: priceInfo.sales - priceInfo.actualCost,
+                                marginPercent: priceInfo.sales !== 0 ? ((priceInfo.sales - priceInfo.actualCost) / priceInfo.sales) * 100 : 0
+                            }}
                         />
                     </div>
                 )}
