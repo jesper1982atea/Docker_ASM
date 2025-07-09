@@ -6,7 +6,7 @@ import json
 from asmapp.asmapi import AppleSchoolManagerAPI
 from gsxapp.applegsx import AppleGSXAPI
 from asmapp.sales_parser import parse_sales_excel # Import the new parser
-from asmapp.price_parser import parse_price_excel # Import the price parser
+from apple_school_manager_with_gui_and_assign.asmapp.price_parser import parse_price_excel # Import the price parser
 import copy
 import shutil
 import logging
