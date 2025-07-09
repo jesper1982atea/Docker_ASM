@@ -398,16 +398,15 @@ class PriceUpload(Resource):
                 new_raw_filename = f"{filename_base}_{today}{file_extension}"
                 save_path = os.path.join(RAW_PRICE_DIR, new_raw_filename)
                 
-                file.stream.seek(0) # Reset stream before saving
                 file.save(save_path)
                 logger.info(f"Saved raw price file to {save_path}")
 
-                # --- Process and Save JSON ---
-                file.stream.seek(0) # Reset stream for parsing
-                data, error = parse_price_excel(file.stream)
+                # --- Process and Save JSON from the saved file ---
+                with open(save_path, 'rb') as saved_file:
+                    data, error = parse_price_excel(saved_file)
                 
                 if error:
-                    logger.error(f"Failed to parse uploaded file {original_filename}: {error}")
+                    logger.error(f"Failed to parse uploaded file {new_raw_filename}: {error}")
                     return {'error': f'Failed to parse file: {error}'}, 500
                 
                 json_filename = f"{filename_base}_{today}.json"
