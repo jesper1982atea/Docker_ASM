@@ -101,7 +101,7 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
                             </span>
                         </div>
                          <div className="detail-item price-box" style={{background: 'var(--atea-light-grey)'}}>
-                             <span className="detail-label">Ny vs. Gammal marginal</span>
+                            <span className="detail-label">Ny vs. Gammal marginal</span>
                              <span className="detail-value" style={{color: 'var(--atea-green)'}}>
                                 {newDeal.marginPercent.toFixed(2)}% vs. {comparison.originalMarginPercent.toFixed(2)}%
                             </span>

@@ -171,7 +171,7 @@ function SalesOrderDetailPage() {
                     const salesPrice = parseFloat(orderData['Tot Förs (SEK)']);
                     const actualCost = parseFloat(orderData['Tot Kost (SEK)']);
 
-                    if (!isNaN(costPrice) && !isNaN(salesPrice)) {
+                    if (!isNaN(costPrice) && !isNaN(salesPrice) && !isNaN(actualCost)) {
                         setPriceInfo({
                             cost: costPrice,
                             sales: salesPrice,
@@ -179,7 +179,8 @@ function SalesOrderDetailPage() {
                             category: productPriceInfo.Category,
                         });
                     } else {
-                        setPriceInfo({ cost: productPriceInfo['ALP Ex VAT'], marginValue: 'N/A', marginPercent: 'N/A' });
+                        // If any value is not a number, we treat it as not found to avoid partial data issues.
+                        setPriceInfo(null); 
                     }
                 } else {
                     setPriceInfo(null); // Not found
