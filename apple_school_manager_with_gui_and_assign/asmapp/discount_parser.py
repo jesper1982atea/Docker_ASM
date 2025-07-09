@@ -1,5 +1,7 @@
 import pandas as pd
 import logging
+import json
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,6 @@ def parse_discount_excel(file_stream):
         - data (list): A list of dicts with 'Product Class' and 'Rebate Rate'.
         - error (str): An error message if parsing fails, otherwise None.
     """
-    logger.critical("DEBUG: parse_discount_excel anropades. Detta bör INTE hända när man sparar från förhandsgranskningen, eftersom frontend ska skicka JSON direkt.")
     try:
         # Headers are in the 3rd row, so we skip the first 2 rows (header=2 in 0-indexed pandas)
         df = pd.read_excel(file_stream, header=2)
@@ -92,3 +93,52 @@ def parse_discount_excel(file_stream):
     except Exception as e:
         logger.error(f"Error parsing discount excel file: {e}", exc_info=True)
         return None, None, str(e)
+
+def save_discount_program_from_json(request_data, discounts_dir):
+    """
+    Saves a discount program from a JSON payload.
+
+    Args:
+        request_data (dict): The JSON data from the request.
+        discounts_dir (str): The directory to save the discount file.
+
+    Returns:
+        - success (bool): True if successful, False otherwise.
+        - message (str): An error or success message.
+    """
+    logger.debug(f"Attempting to save discount program from JSON: {request_data}")
+
+    # Be flexible with key names (camelCase from JS vs. snake_case from Python)
+    program_name = request_data.get('program_name') or request_data.get('programName')
+    data = request_data.get('data')
+
+    if not program_name:
+        logger.error("'program_name' not found in request JSON.")
+        return False, "Program name is missing."
+    
+    if not data or not isinstance(data, list):
+        logger.error(f"'data' is missing or not a list for program '{program_name}'.")
+        return False, "No valid data rows found to save."
+
+    # Basic validation of data rows
+    if not all('Product Class' in row and 'Rebate Rate' in row for row in data):
+        logger.error(f"Data rows are missing 'Product Class' or 'Rebate Rate' for program '{program_name}'.")
+        return False, "Invalid data format: Each row must have 'Product Class' and 'Rebate Rate'."
+
+    try:
+        # Sanitize filename
+        safe_filename = "".join(c for c in program_name if c.isalnum() or c in (' ', '_', '-')).rstrip()
+        filepath = os.path.join(discounts_dir, f"{safe_filename}.json")
+
+        # Create the directory if it doesn't exist
+        os.makedirs(discounts_dir, exist_ok=True)
+
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+        
+        logger.info(f"Successfully saved discount program '{program_name}' to {filepath}")
+        return True, f"Program '{program_name}' saved successfully."
+
+    except Exception as e:
+        logger.error(f"Failed to save discount program '{program_name}': {e}", exc_info=True)
+        return False, f"An internal error occurred: {e}"

@@ -7,7 +7,7 @@ from asmapp.asmapi import AppleSchoolManagerAPI
 from gsxapp.applegsx import AppleGSXAPI
 from asmapp.sales_parser import parse_sales_excel # Import the new parser
 from asmapp.price_parser import parse_price_excel # Import the price parser
-from asmapp.discount_parser import parse_discount_excel # Import the discount parser
+from asmapp.discount_parser import parse_discount_excel, save_discount_program_from_json # Import the discount parser
 import asmapp.discount_handler as discount_handler # Import the discount handler
 import copy
 import shutil
@@ -460,49 +460,22 @@ class FunctionalDiscounts(Resource):
 class DiscountUpload(Resource):
     def post(self):
         """
-        Processes a new discount program.
-        Can handle either a direct JSON payload or an uploaded Excel file.
+        Processes a new discount program from a JSON payload.
         """
-        content_type = request.content_type
-        
-        # Handle Excel file upload
-        if 'multipart/form-data' in content_type:
-            if 'file' not in request.files:
-                return {'error': 'No file part in the request'}, 400
-            
-            file = request.files['file']
-            if file.filename == '':
-                return {'error': 'No file selected for uploading'}, 400
+        if not request.is_json:
+            return jsonify({"error": "Request must be JSON"}), 400
 
-            if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
-                program_name, data, error = parse_discount_excel(file.stream)
-                if error:
-                    return {'error': f'Failed to parse Excel file: {error}'}, 500
-            else:
-                return {'error': 'Invalid file type, please upload an Excel file (.xlsx or .xls)'}, 400
+        request_data = request.get_json()
         
-        # Handle JSON payload
-        elif 'application/json' in content_type:
-            payload = request.get_json()
-            if not payload:
-                return {'error': 'Invalid JSON payload'}, 400
+        # Use the directory managed by the discount_handler
+        discounts_dir = discount_handler.DISCOUNTS_DIR
+        
+        success, message = save_discount_program_from_json(request_data, discounts_dir)
 
-            program_name = payload.get('program_name')
-            data = payload.get('data')
-        
+        if success:
+            return jsonify({"message": message}), 201 # 201 for resource created
         else:
-            return {'error': f'Unsupported content type: {content_type}'}, 415
-
-        if not program_name or not data:
-            return {'error': 'Missing program_name or data in payload'}, 400
-
-        # The handler saves the discount program from the parsed data
-        filename, error = discount_handler.save_discount_from_data(program_name, data)
-
-        if error:
-            return {'error': error}, 400
-        
-        return {'status': 'success', 'filename': filename}, 201
+            return jsonify({"error": message}), 400
 
 @discount_ns.route('/<string:program_name>')
 class DiscountFile(Resource):
