@@ -11,13 +11,17 @@
   <body>
     <header class="atea-header">
       <div class="header-content">
-        <img src="/frontend/images/logo.jpg" alt="Atea Logo" class="header-logo"/>
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <img src="/frontend/images/logo.jpg" alt="Atea Logo" class="header-logo" style="height: 50px;"/>
+            <div>
+                <h1>Adminpanel</h1>
+                <p>Hantera Apple School Manager-integrationer</p>
+            </div>
+        </div>
         <div>
-            <h1>Apple School Manager – Adminpanel</h1>
-            <p>
-              Hantera flera kunders Apple School Manager-integrationer.<br>
-              Lägg till nya kunder, se befintliga och testa integrationen direkt i Swagger.
-            </p>
+            <button id="add-customer-btn" class="btn btn-primary" style="background: var(--atea-white); color: var(--atea-green);">
+                + Lägg till kund
+            </button>
         </div>
       </div>
     </header>
