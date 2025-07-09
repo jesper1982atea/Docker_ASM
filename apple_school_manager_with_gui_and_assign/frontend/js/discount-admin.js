@@ -59,16 +59,27 @@ function DiscountAdminPage() {
                 console.log("DEBUG: FileReader har läst filen.");
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                console.log("DEBUG: Excel-filen har tolkats till ett 'workbook'-objekt:", workbook);
-
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                console.log(`DEBUG: Använder kalkylblad: '${firstSheetName}'`);
                 
                 // Konvertera kalkylblad till JSON, med rubriker från rad 3 (index 2)
-                const json = XLSX.utils.sheet_to_json(worksheet, { header: 2 });
-                console.log("DEBUG: Rådata från Excel (som JSON):", json);
-                if (json.length === 0) {
+                let json = XLSX.utils.sheet_to_json(worksheet, { header: 2 });
+                console.log("DEBUG: Rådata från Excel (som JSON):", JSON.parse(JSON.stringify(json)));
+
+                // Helper to trim whitespace from object keys
+                const trimKeys = (arr) => arr.map(obj => 
+                    Object.keys(obj).reduce((acc, key) => {
+                        acc[key.trim()] = obj[key];
+                        return acc;
+                    }, {})
+                );
+
+                json = trimKeys(json);
+                console.log("DEBUG: Data efter att ha rensat kolumnnamn:", JSON.parse(JSON.stringify(json)));
+
+                if (json.length > 0) {
+                    console.log("DEBUG: Kolumnnamn som hittades i första raden:", Object.keys(json[0]));
+                } else {
                     console.warn("DEBUG: Inga datarader hittades i Excel-filen efter rubrikrad 3.");
                 }
 
@@ -81,10 +92,6 @@ function DiscountAdminPage() {
                     .filter(row => {
                         const hasProductClass = row['Product Class'];
                         const hasRebateRate = row['Rebate Rate (%)'] !== undefined;
-                        // Logga rader som filtreras bort för felsökning
-                        if (!hasProductClass || !hasRebateRate) {
-                            console.log("DEBUG: Filtrerar bort rad pga saknad data:", row);
-                        }
                         return hasProductClass && hasRebateRate;
                     })
                     .map(row => {
