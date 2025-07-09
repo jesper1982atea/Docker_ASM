@@ -171,6 +171,10 @@ function PriceDetailPage() {
                         <div className="card">
                             <h3>{productData['Description']}</h3>
                             <p>{productData['SAP Part Description']}</p>
+                            <div className="detail-item" style={{paddingTop: '1rem', borderTop: '1px solid var(--border-color)', marginTop: '1rem'}}>
+                                <div className="detail-label">Kategori</div>
+                                <div className="detail-value">{productData['Category'] || 'N/A'}</div>
+                            </div>
                         </div>
                         <div className="card">
                             <h3>Nyckelinformation</h3>
