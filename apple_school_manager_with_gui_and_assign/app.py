@@ -5,6 +5,7 @@ import os
 import json
 from asmapp.asmapi import AppleSchoolManagerAPI
 from gsxapp.applegsx import AppleGSXAPI
+from asmapp.sales_parser import parse_sales_excel # Import the new parser
 import copy
 import shutil
 import logging
@@ -308,6 +309,32 @@ class TokenStatus(Resource):
 
 api.add_namespace(customer_ns)
 
+# --- New Sales API Namespace ---
+sales_ns = Namespace('sales', description='Atea Sales Data Endpoints')
+
+@sales_ns.route('/upload')
+class SalesUpload(Resource):
+    def post(self):
+        """Parses an uploaded Atea sales Excel file."""
+        if 'file' not in request.files:
+            return {'error': 'No file part in the request'}, 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return {'error': 'No file selected for uploading'}, 400
+
+        if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+            data, error = parse_sales_excel(file.stream)
+            if error:
+                return {'error': f'Failed to parse file: {error}'}, 500
+            return jsonify(data)
+        else:
+            return {'error': 'Invalid file type, please upload an Excel file (.xlsx or .xls)'}, 400
+
+api.add_namespace(sales_ns, path='/api/sales')
+# --- End of New Sales API Namespace ---
+
+
 @api.route("/customers")
 @api.route("/api/customers")
 class Customers(Resource):
@@ -558,6 +585,11 @@ def swagger_spec_customer(customer_id):
 def customer_devices_page(customer_id):
     """Serve the customer-specific devices page"""
     return send_from_directory(FRONTEND_DIR, "customer-devices.html")
+
+@app.route("/sales-upload")
+def sales_upload_page():
+    """Serve the sales upload page"""
+    return send_from_directory(FRONTEND_DIR, "sales-upload.html")
 
 @customer_ns.route('/<string:customer_id>/orgDeviceActivities/unassign')
 class OrgDeviceActivitiesUnassign(Resource):
