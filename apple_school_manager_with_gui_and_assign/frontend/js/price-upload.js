@@ -58,6 +58,7 @@ function PriceUploader() {
     const [error, setError] = useState('');
     const [fileName, setFileName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
 
@@ -86,6 +87,7 @@ function PriceUploader() {
 
             const result = await response.json();
             setData(result);
+            setSelectedCategory('All'); // Reset category filter
             setCurrentPage(1); // Reset to first page on new data
         } catch (err) {
             setError(err.message);
@@ -94,14 +96,26 @@ function PriceUploader() {
         }
     };
 
+    const categories = useMemo(() => {
+        if (!data) return [];
+        const uniqueCategories = [...new Set(data.map(item => item.Category))];
+        return ['All', ...uniqueCategories.filter(c => c && c !== 'Uncategorized').sort(), 'Uncategorized'];
+    }, [data]);
+
     const filteredData = useMemo(() => {
-        if (!searchTerm) return data;
-        return data.filter(row =>
+        let result = data;
+
+        if (selectedCategory && selectedCategory !== 'All') {
+            result = result.filter(row => row.Category === selectedCategory);
+        }
+
+        if (!searchTerm) return result;
+        return result.filter(row =>
             Object.values(row).some(value =>
                 String(value).toLowerCase().includes(searchTerm.toLowerCase())
             )
         );
-    }, [data, searchTerm]);
+    }, [data, searchTerm, selectedCategory]);
 
     const totalPages = Math.ceil(filteredData.length / itemsPerPage);
     const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -139,7 +153,7 @@ function PriceUploader() {
                 {data.length > 0 && (
                     <div style={{ marginTop: '2rem' }}>
                         <div className="filters" style={{padding: '1rem', marginBottom: '1rem'}}>
-                            <div className="filter-grid" style={{gridTemplateColumns: '1fr'}}>
+                            <div className="filter-grid" style={{gridTemplateColumns: '1fr 1fr', gap: '1rem'}}>
                                 <div className="filter-group">
                                     <label htmlFor="search-term">Sök i tabellen</label>
                                     <input
@@ -147,8 +161,18 @@ function PriceUploader() {
                                         id="search-term"
                                         placeholder="Sök på artikelnummer, beskrivning, etc."
                                         value={searchTerm}
-                                        onChange={e => setSearchTerm(e.target.value)}
+                                        onChange={e => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                                     />
+                                </div>
+                                <div className="filter-group">
+                                    <label htmlFor="category-filter">Filtrera på kategori</label>
+                                    <select
+                                        id="category-filter"
+                                        value={selectedCategory}
+                                        onChange={e => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
+                                    >
+                                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                    </select>
                                 </div>
                             </div>
                         </div>
