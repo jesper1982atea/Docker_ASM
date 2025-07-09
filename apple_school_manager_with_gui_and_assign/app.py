@@ -463,7 +463,7 @@ class DiscountUpload(Resource):
         Processes a new discount program from a JSON payload.
         """
         if not request.is_json:
-            return jsonify({"error": "Request must be JSON"}), 400
+            return {"error": "Request must be JSON"}, 400
 
         request_data = request.get_json()
         
@@ -473,9 +473,9 @@ class DiscountUpload(Resource):
         success, message = save_discount_program_from_json(request_data, discounts_dir)
 
         if success:
-            return jsonify({"message": message}), 201 # 201 for resource created
+            return {"message": message}, 201 # 201 for resource created
         else:
-            return jsonify({"error": message}), 400
+            return {"error": message}, 400
 
 @discount_ns.route('/<string:program_name>')
 class DiscountFile(Resource):
