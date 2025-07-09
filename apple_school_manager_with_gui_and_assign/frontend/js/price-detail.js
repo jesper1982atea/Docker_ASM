@@ -10,6 +10,7 @@ function PriceDetailPage() {
     const [discountData, setDiscountData] = useState(null);
     const [residualValuePercent, setResidualValuePercent] = useState('');
     const [leaseTerm, setLeaseTerm] = useState(36);
+    const [paymentModel, setPaymentModel] = useState('monthly'); // 'monthly' or 'circular'
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -39,6 +40,12 @@ function PriceDetailPage() {
         };
         fetchDiscounts();
     }, []);
+
+    useEffect(() => {
+        if (paymentModel === 'circular') {
+            setLeaseTerm(36);
+        }
+    }, [paymentModel]);
 
     useEffect(() => {
         if (!selectedDiscount) {
@@ -302,19 +309,39 @@ function PriceDetailPage() {
                             </div>
 
                             <div className="price-item">
-                                <label>Välj avtalsperiod</label>
+                                <label>Välj betalningsmodell</label>
                                 <div className="term-selector">
-                                    {[24, 36, 48].map(term => (
-                                        <button
-                                            key={term}
-                                            className={`term-btn ${leaseTerm === term ? 'active' : ''}`}
-                                            onClick={() => setLeaseTerm(term)}
-                                        >
-                                            {term} mån
-                                        </button>
-                                    ))}
+                                    <button
+                                        className={`term-btn ${paymentModel === 'monthly' ? 'active' : ''}`}
+                                        onClick={() => setPaymentModel('monthly')}
+                                    >
+                                        Månadskostnad
+                                    </button>
+                                    <button
+                                        className={`term-btn ${paymentModel === 'circular' ? 'active' : ''}`}
+                                        onClick={() => setPaymentModel('circular')}
+                                    >
+                                        Circular Choice
+                                    </button>
                                 </div>
                             </div>
+
+                            {paymentModel === 'monthly' && (
+                                <div className="price-item">
+                                    <label>Välj avtalsperiod</label>
+                                    <div className="term-selector">
+                                        {[24, 36, 48].map(term => (
+                                            <button
+                                                key={term}
+                                                className={`term-btn ${leaseTerm === term ? 'active' : ''}`}
+                                                onClick={() => setLeaseTerm(term)}
+                                            >
+                                                {term} mån
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="price-summary">
                                 <div className="summary-section">
@@ -349,12 +376,32 @@ function PriceDetailPage() {
                                     </div>
                                 </div>
 
-                                <div className="summary-section monthly">
-                                     <div className="summary-row monthly-price">
-                                        <span>Pris per månad ({leaseTerm} mån)</span>
-                                        <span className="value">{formatNumber(monthlyPrice)} kr</span>
+                                {paymentModel === 'monthly' ? (
+                                    <div className="summary-section monthly">
+                                         <div className="summary-row monthly-price">
+                                            <span>Pris per månad ({leaseTerm} mån)</span>
+                                            <span className="value">{formatNumber(monthlyPrice)} kr</span>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="summary-section circular">
+                                        <h4 className="summary-header">Circular Choice (36 mån)</h4>
+                                        <div className="summary-row">
+                                            <span>Första betalning (vid start)</span>
+                                            <span className="value">{formatNumber(finalPrice)} kr</span>
+                                        </div>
+                                        <div className="summary-row">
+                                            <span>Andra betalning (om du behåller produkten)</span>
+                                            <span className="value">{formatNumber(residualValueSEK)} kr</span>
+                                        </div>
+                                        <hr />
+                                        <div className="summary-row total">
+                                            <span>Total kostnad (om du behåller produkten)</span>
+                                            <span className="value">{formatNumber(customerPriceNum)} kr</span>
+                                        </div>
+                                        <p className="summary-note">Om produkten returneras efter 36 månader utgår den andra betalningen.</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
