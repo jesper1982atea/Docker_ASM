@@ -8,6 +8,12 @@ function SalesOrderDetailPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // New state for price lookup
+    const [priceLists, setPriceLists] = useState([]);
+    const [selectedPriceList, setSelectedPriceList] = useState('');
+    const [priceInfo, setPriceInfo] = useState(null);
+    const [priceLoading, setPriceLoading] = useState(false);
+
     useEffect(() => {
         // Parse order data from URL
         const params = new URLSearchParams(window.location.search);
@@ -37,7 +43,24 @@ function SalesOrderDetailPage() {
                 console.error("Failed to fetch customers", e);
             }
         };
+        
+        // Fetch available price lists
+        const fetchPriceLists = async () => {
+            try {
+                const res = await fetch('/api/price/list');
+                if (!res.ok) return;
+                const files = await res.json();
+                setPriceLists(files);
+                if (files.length > 0) {
+                    setSelectedPriceList(files[0]); // Default to the latest
+                }
+            } catch (e) {
+                console.error("Failed to fetch price lists", e);
+            }
+        };
+
         fetchCustomers();
+        fetchPriceLists();
     }, []);
 
     useEffect(() => {
@@ -45,6 +68,53 @@ function SalesOrderDetailPage() {
             fetchGsxDetails();
         }
     }, [orderData, selectedCustomer]);
+
+    // Effect to find price when price list or order data changes
+    useEffect(() => {
+        if (!selectedPriceList || !orderData) {
+            setPriceInfo(null);
+            return;
+        }
+
+        const findPrice = async () => {
+            setPriceLoading(true);
+            setPriceInfo(null);
+            try {
+                const res = await fetch(`/api/price/data/${selectedPriceList}`);
+                if (!res.ok) throw new Error('Failed to load price data');
+                const priceData = await res.json();
+                
+                const partNumber = orderData['Artikelnr (tillverkare)'];
+                const productPriceInfo = priceData.find(item => item['Part Number'] === partNumber);
+
+                if (productPriceInfo) {
+                    const costPrice = parseFloat(productPriceInfo['ALP Ex VAT']);
+                    const salesPrice = parseFloat(orderData['Tot Förs (SEK)']);
+
+                    if (!isNaN(costPrice) && !isNaN(salesPrice)) {
+                        const marginValue = salesPrice - costPrice;
+                        const marginPercent = salesPrice !== 0 ? (marginValue / salesPrice) * 100 : 0;
+                        setPriceInfo({
+                            cost: costPrice.toFixed(2),
+                            marginValue: marginValue.toFixed(2),
+                            marginPercent: marginPercent.toFixed(2)
+                        });
+                    } else {
+                        setPriceInfo({ cost: productPriceInfo['ALP Ex VAT'], marginValue: 'N/A', marginPercent: 'N/A' });
+                    }
+                } else {
+                    setPriceInfo(null); // Not found
+                }
+            } catch (e) {
+                console.error("Error fetching or processing price data", e);
+                setPriceInfo({ error: 'Could not process price data.' });
+            } finally {
+                setPriceLoading(false);
+            }
+        };
+
+        findPrice();
+    }, [selectedPriceList, orderData]);
 
     const fetchGsxDetails = async () => {
         const serialNumber = orderData?.['Serienr'];
@@ -233,6 +303,44 @@ function SalesOrderDetailPage() {
                         </div>
                     </div>
                 </div>
+
+                {/* --- Price & Margin Information --- */}
+                <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                        <h3 style={{ margin: 0 }}>Pris & Marginal</h3>
+                        <div className="form-group" style={{margin: 0}}>
+                            <label htmlFor="price-list-select" style={{marginRight: '1rem'}}>Prislista:</label>
+                            <select id="price-list-select" value={selectedPriceList} onChange={e => setSelectedPriceList(e.target.value)} disabled={priceLists.length === 0}>
+                                {priceLists.length > 0 ? (
+                                    priceLists.map(f => <option key={f} value={f}>{f}</option>)
+                                ) : (
+                                    <option>Inga prislistor</option>
+                                )}
+                            </select>
+                        </div>
+                    </div>
+                    {priceLoading ? (
+                        <div className="loading"><div className="spinner-small"></div><p>Hämtar pris...</p></div>
+                    ) : priceInfo ? (
+                        <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start', background: 'var(--atea-light-grey)', padding: '1rem', borderRadius: '5px' }}>
+                                <span className="detail-label">Inköpspris (ALP Ex VAT)</span>
+                                <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600' }}>{priceInfo.cost} SEK</span>
+                            </div>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start', background: 'var(--atea-light-grey)', padding: '1rem', borderRadius: '5px' }}>
+                                <span className="detail-label">Marginal</span>
+                                <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600', color: priceInfo.marginValue < 0 ? 'var(--atea-red)' : 'var(--atea-green)' }}>{priceInfo.marginValue} SEK</span>
+                            </div>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start', background: 'var(--atea-light-grey)', padding: '1rem', borderRadius: '5px' }}>
+                                <span className="detail-label">Marginal (%)</span>
+                                <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600', color: priceInfo.marginPercent < 0 ? 'var(--atea-red)' : 'var(--atea-green)' }}>{priceInfo.marginPercent} %</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <p>Inget pris hittades för artikelnummer <strong>{orderData['Artikelnr (tillverkare)']}</strong> i den valda prislistan.</p>
+                    )}
+                </div>
+
 
                 <div className="section">
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem'}}>
