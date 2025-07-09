@@ -9,6 +9,7 @@ function DiscountAdminPage() {
     const [uploading, setUploading] = useState(false);
     const [previewData, setPreviewData] = useState(null);
     const [programName, setProgramName] = useState('');
+    const [rawPreviewData, setRawPreviewData] = useState(null); // For debugging
 
     // State for global functional discounts
     const [functionalDiscounts, setFunctionalDiscounts] = useState([]);
@@ -52,11 +53,12 @@ function DiscountAdminPage() {
         if (!f) return;
         setFile(f);
         setError(''); // Clear previous errors
+        setPreviewData(null);
+        setRawPreviewData(null);
         
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                console.log("DEBUG: FileReader har läst filen.");
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheetName = workbook.SheetNames[0];
@@ -64,7 +66,6 @@ function DiscountAdminPage() {
                 
                 // Konvertera kalkylblad till JSON, med rubriker från rad 3 (index 2)
                 let json = XLSX.utils.sheet_to_json(worksheet, { header: 2 });
-                console.log("DEBUG: Rådata från Excel (som JSON):", JSON.parse(JSON.stringify(json)));
 
                 // Helper to trim whitespace from object keys
                 const trimKeys = (arr) => arr.map(obj => 
@@ -75,25 +76,18 @@ function DiscountAdminPage() {
                 );
 
                 json = trimKeys(json);
-                console.log("DEBUG: Data efter att ha rensat kolumnnamn:", JSON.parse(JSON.stringify(json)));
+                setRawPreviewData(json); // Save raw data for debugging view
 
                 if (json.length > 0) {
                     console.log("DEBUG: Kolumnnamn som hittades i första raden:", Object.keys(json[0]));
-                } else {
-                    console.warn("DEBUG: Inga datarader hittades i Excel-filen efter rubrikrad 3.");
                 }
 
                 // Hämta programnamnet från första raden med data
                 const programNameFromFile = json.length > 0 && json[0]['Program Name'] ? json[0]['Program Name'] : f.name.replace(/\.(xlsx|xls)$/, '');
                 setProgramName(programNameFromFile);
-                console.log("DEBUG: Programnamn satt till:", programNameFromFile);
 
                 const sanitizedData = json
-                    .filter(row => {
-                        const hasProductClass = row['Product Class'];
-                        const hasRebateRate = row['Rebate Rate (%)'] !== undefined;
-                        return hasProductClass && hasRebateRate;
-                    })
+                    .filter(row => row['Product Class'] && row['Rebate Rate (%)'] !== undefined)
                     .map(row => {
                         let rate = row['Rebate Rate (%)'];
                         if (typeof rate === 'string') {
@@ -108,11 +102,10 @@ function DiscountAdminPage() {
                         };
                     });
 
-                console.log("DEBUG: Bearbetad data för förhandsgranskning:", sanitizedData);
                 setPreviewData(sanitizedData);
 
                 if (sanitizedData.length === 0 && json.length > 0) {
-                    setError("Filen lästes in, men inga giltiga rader med både 'Product Class' och 'Rebate Rate (%)' hittades. Kontrollera kolumnrubrikerna och innehållet.");
+                    setError("Filen lästes in, men inga giltiga rader med både 'Product Class' och 'Rebate Rate (%)' hittades. Granska rådatan nedan för att verifiera kolumnrubriker och innehåll.");
                 }
 
             } catch (err) {
@@ -317,6 +310,29 @@ function DiscountAdminPage() {
                         <button onClick={handleUpload} disabled={uploading || !programName} className="btn btn-success" style={{ marginTop: '1rem' }}>
                             {uploading ? 'Sparar...' : 'Spara program'}
                         </button>
+                    </div>
+                )}
+
+                {error && rawPreviewData && rawPreviewData.length > 0 && (
+                    <div style={{ marginTop: '2rem', borderTop: '2px solid var(--atea-red)', paddingTop: '1rem' }}>
+                        <h4 style={{color: 'var(--atea-red)'}}>Felsökning: Rådata från Excel-fil</h4>
+                        <p>Detta är den exakta datan som lästs från filen. Kontrollera att kolumnrubrikerna (t.ex. 'Product Class') stämmer exakt.</p>
+                        <div className="table-container" style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                            <table className="table">
+                                <thead>
+                                    <tr>
+                                        {Object.keys(rawPreviewData[0]).map(key => <th key={key}>{key}</th>)}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rawPreviewData.map((row, index) => (
+                                        <tr key={index}>
+                                            {Object.values(row).map((val, i) => <td key={i}>{String(val)}</td>)}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 )}
             </div>
