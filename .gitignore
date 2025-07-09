@@ -4,8 +4,8 @@ apple_school_manager_with_gui_and_assign/admin_api/discounts/
 
 # Sensitive data and uploads - DO NOT COMMIT
 # This includes customer credentials, discount files, and uploaded price lists.
-/admin_api/
-/price_uploads/
+apple_school_manager_with_gui_and_assign/admin_api/
+apple_school_manager_with_gui_and_assign/price_uploads/
 
 # Python cache
 __pycache__/
@@ -57,3 +57,5 @@ logs/
 .env.local
 .env.production
 /apple_school_manager_with_gui_and_assign/gsxapp/parsejson.py
+apple_school_manager_with_gui_and_assign/price_uploads/processed/Price_List_Sweden_L597287A-en_GB-9_2025-07-09.json
+apple_school_manager_with_gui_and_assign/price_uploads/raw/Price_List_Sweden_L597287A-en_GB-9_2025-07-09.xlsx
