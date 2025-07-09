@@ -81,6 +81,28 @@ function SalesUploader() {
     const [error, setError] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
+    const [customers, setCustomers] = useState([]);
+    const [selectedCustomer, setSelectedCustomer] = useState('');
+    const [isExporting, setIsExporting] = useState(false);
+    const [exportProgress, setExportProgress] = useState(0);
+
+    useEffect(() => {
+        // Fetch customers with GSX keys
+        const fetchCustomers = async () => {
+            try {
+                const res = await fetch('/api/customers');
+                const allCustomers = await res.json();
+                const gsxCustomers = allCustomers.filter(c => c.gsx_api_key);
+                setCustomers(gsxCustomers);
+                if (gsxCustomers.length > 0) {
+                    setSelectedCustomer(gsxCustomers[0].id);
+                }
+            } catch (e) {
+                console.error("Failed to fetch customers", e);
+            }
+        };
+        fetchCustomers();
+    }, []);
 
     const handleFileChange = (event) => {
         setFile(event.target.files[0]);
@@ -129,6 +151,71 @@ function SalesUploader() {
         }
     };
 
+    const handleBulkExport = async () => {
+        if (!data || data.length === 0) {
+            alert("Ingen data att exportera.");
+            return;
+        }
+        if (!selectedCustomer) {
+            alert("Välj en kund för GSX-uppslag.");
+            return;
+        }
+    
+        setIsExporting(true);
+        setExportProgress(0);
+    
+        const exportData = [];
+        const totalRows = data.length;
+    
+        for (let i = 0; i < totalRows; i++) {
+            const row = data[i];
+            const serialNumber = row['Serienr'];
+            let gsxData = {};
+    
+            if (serialNumber) {
+                try {
+                    const res = await fetch(`/api/${selectedCustomer}/gsx/device-details/${serialNumber}`);
+                    if (res.ok) {
+                        const result = await res.json();
+                        if (result && result.device) {
+                            // Flatten GSX data for Excel
+                            gsxData = {
+                                'GSX Produktbeskrivning': result.device.productDescription,
+                                'GSX Konfiguration': result.device.configDescription,
+                                'GSX Garantistatus': result.device.warrantyInfo?.warrantyStatusDescription,
+                                'GSX Inköpsdatum': result.device.warrantyInfo?.purchaseDate ? new Date(result.device.warrantyInfo.purchaseDate).toLocaleDateString() : 'N/A',
+                                'GSX Dagar kvar på garanti': result.device.warrantyInfo?.daysRemaining,
+                                'GSX Upplåst': result.device.activationDetails?.unlocked ? 'Ja' : 'Nej',
+                            };
+                        }
+                    }
+                } catch (e) {
+                    console.error(`Failed to fetch GSX for ${serialNumber}:`, e);
+                    gsxData = { 'GSX Produktbeskrivning': 'Fel vid hämtning' };
+                }
+            }
+            
+            // Add a small delay to not hammer the API
+            await new Promise(resolve => setTimeout(resolve, 200));
+    
+            exportData.push({ ...row, ...gsxData });
+            setExportProgress(((i + 1) / totalRows) * 100);
+        }
+    
+        // Create and download Excel file
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Säljdata med GSX");
+    
+        // Auto-fit columns by setting a sensible default width
+        const colWidths = Object.keys(exportData[0] || {}).map(key => ({ wch: Math.max(key.length, 18) }));
+        worksheet["!cols"] = colWidths;
+    
+        XLSX.writeFile(workbook, "Säljdata_Export.xlsx");
+    
+        setIsExporting(false);
+    };
+
     const handleRowClick = (row) => {
         const rowData = encodeURIComponent(JSON.stringify(row));
         window.location.href = `/sales-order-detail?data=${rowData}`;
@@ -161,6 +248,29 @@ function SalesUploader() {
                         </button>
                     </div>
                     {error && <p style={{ color: 'var(--atea-red)', marginTop: '1rem' }}>{error}</p>}
+
+                    <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '2rem', paddingTop: '1.5rem' }}>
+                        <h4>Exportera med GSX-data</h4>
+                        <p>Välj en kund nedan för att berika exporten med GSX-information för varje serienummer.</p>
+                        <div className="form-group">
+                            <label>Välj kund för GSX-uppslag</label>
+                            <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} disabled={customers.length === 0 || isExporting}>
+                                {customers.length > 0 ? (
+                                    customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
+                                ) : (
+                                    <option>Inga kunder med GSX-nyckel</option>
+                                )}
+                            </select>
+                        </div>
+                        <button onClick={handleBulkExport} disabled={!data || !selectedCustomer || isExporting} className="btn btn-success">
+                            {isExporting ? `Exporterar... (${Math.round(exportProgress)}%)` : 'Exportera allt till Excel'}
+                        </button>
+                        {isExporting && (
+                            <div className="progress-bar" style={{marginTop: '1rem'}}>
+                                <div className="progress-bar-inner" style={{width: `${exportProgress}%`}}></div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {loading && <div className="loading" style={{marginTop: '2rem'}}><div className="spinner"></div><p>Läser filen...</p></div>}
