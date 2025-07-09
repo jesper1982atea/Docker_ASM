@@ -37,17 +37,20 @@ def parse_discount_excel(file_stream):
         # Headers are in the 3rd row, so we skip the first 2 rows (header=2 in 0-indexed pandas)
         df = pd.read_excel(file_stream, header=2)
         
-        # Trim whitespace from column headers to avoid matching issues
-        df.columns = df.columns.str.strip()
-        logger.debug(f"Columns found in Excel file: {df.columns.tolist()}")
+        # Store original columns for error messages
+        original_columns = df.columns.tolist()
         
-        # Define expected headers
-        required_headers = ['Product Class', 'Rebate Rate (%)', 'Program Name']
+        # Trim whitespace and convert to lower case for case-insensitive matching
+        df.columns = df.columns.str.strip().str.lower()
+        logger.debug(f"Normalized columns found in Excel file: {df.columns.tolist()}")
+        
+        # Define expected headers in lower case
+        required_headers = ['product class', 'rebate rate (%)', 'program name']
         
         # Check if all required headers are present
         if not all(h in df.columns for h in required_headers):
             missing = [h for h in required_headers if h not in df.columns]
-            logger.error(f"Missing required columns. Found: {df.columns.tolist()}")
+            logger.error(f"Missing required columns. Found: {original_columns}")
             return None, None, f"Missing required columns: {', '.join(missing)}"
 
         # Drop rows where ALL columns are NaN (empty rows)
@@ -55,7 +58,7 @@ def parse_discount_excel(file_stream):
         
         # Drop rows where essential columns are empty
         initial_rows = len(df)
-        df.dropna(subset=['Product Class', 'Rebate Rate (%)', 'Program Name'], inplace=True)
+        df.dropna(subset=['product class', 'rebate rate (%)', 'program name'], inplace=True)
         logger.debug(f"Rows before cleaning: {initial_rows}. Rows after dropping NA: {len(df)}.")
 
         # Check if there is any data left
@@ -64,13 +67,16 @@ def parse_discount_excel(file_stream):
             return None, None, "No valid data found in the file after cleaning."
 
         # Extract program name. Assume it's the same for all rows.
-        program_names = df['Program Name'].unique()
+        program_names = df['program name'].unique()
         if len(program_names) > 1:
             logger.warning(f"Multiple program names found: {program_names}. Using the first one: '{program_names[0]}'.")
         program_name = str(program_names[0])
 
         # Apply the robust conversion function to create the final 'Rebate Rate'
-        df['Rebate Rate'] = df['Rebate Rate (%)'].apply(_convert_rebate_rate)
+        df['Rebate Rate'] = df['rebate rate (%)'].apply(_convert_rebate_rate)
+        
+        # Rename 'product class' to 'Product Class' for the output dictionary
+        df.rename(columns={'product class': 'Product Class'}, inplace=True)
         
         # Create the list of dictionaries from the processed DataFrame
         data = df[['Product Class', 'Rebate Rate']].to_dict('records')
