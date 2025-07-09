@@ -138,15 +138,18 @@ function DiscountAdminPage() {
     };
 
     const handleDelete = async (programNameToDelete) => {
-        if (!window.confirm(`Är du säker på att du vill radera rabattprogrammet "${programNameToDelete}"?`)) return;
-
+        if (!window.confirm(`Är du säker på att du vill radera rabattprogrammet "${programNameToDelete}"?`)) {
+            return;
+        }
         try {
             const response = await fetch(`/api/discounts/${programNameToDelete}`, {
                 method: 'DELETE',
             });
-            if (!response.ok) throw new Error('Failed to delete file');
-            // Refresh list
-            await fetchDiscounts();
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.error || 'Kunde inte radera programmet.');
+            }
+            fetchDiscounts(); // Refresh the list
         } catch (err) {
             setError(err.message);
         }
@@ -262,33 +265,29 @@ function DiscountAdminPage() {
             </div>
 
             <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
-                <h3>Tillgängliga Rabattprogram</h3>
+                <h3>Befintliga rabattprogram</h3>
                 {loading ? (
-                    <p>Laddar...</p>
-                ) : discounts.length > 0 ? (
-                    <ul className="item-list">
-                        {discounts.map(program => (
-                            <li key={program} className="item-list-item">
-                                <span>{program}</span>
-                                <button onClick={() => handleDelete(program)} className="btn btn-danger btn-sm">Ta bort</button>
+                    <div className="loading"><div className="spinner-small"></div><p>Laddar program...</p></div>
+                ) : error ? (
+                    <div className="alert alert-danger">{error}</div>
+                ) : (
+                    <ul className="file-list">
+                        {discounts.map(name => (
+                            <li key={name}>
+                                <span>{name}</span>
+                                <button onClick={() => handleDelete(name)} className="btn-delete">&times;</button>
                             </li>
                         ))}
                     </ul>
-                ) : (
-                    <p>Inga rabattprogram tillgängliga. Ladda upp ett nytt ovan.</p>
                 )}
             </div>
-
-            {error && (
-                <div className="error-message" style={{ color: 'red', marginTop: '1rem' }}>
-                    {error}
-                </div>
-            )}
         </div>
     );
 }
 
-const domContainer = document.querySelector('#react-discount-admin');
-ReactDOM.render(React.createElement(DiscountAdminPage), domContainer);
+const domContainer = document.getElementById('root');
+const root = ReactDOM.createRoot(domContainer);
+root.render(<DiscountAdminPage />);
+
 
 
