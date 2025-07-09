@@ -61,6 +61,53 @@ function PriceUploader() {
     const [selectedCategory, setSelectedCategory] = useState('All');
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(25);
+    const [processedFiles, setProcessedFiles] = useState([]);
+    const [selectedFile, setSelectedFile] = useState('');
+
+    const fetchProcessedFiles = async () => {
+        try {
+            const response = await fetch('/api/price/list');
+            if (!response.ok) throw new Error('Could not fetch price lists');
+            const files = await response.json();
+            setProcessedFiles(files);
+            if (files.length > 0) {
+                setSelectedFile(files[0]); // Select the most recent file by default
+            }
+        } catch (err) {
+            setError(err.message);
+        }
+    };
+
+    useEffect(() => {
+        fetchProcessedFiles();
+    }, []);
+
+    useEffect(() => {
+        if (!selectedFile) {
+            setData([]);
+            return;
+        }
+        const loadFileData = async () => {
+            setLoading(true);
+            setError('');
+            try {
+                const response = await fetch(`/api/price/data/${selectedFile}`);
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'Failed to load file data');
+                }
+                const result = await response.json();
+                setData(result);
+                setFileName(selectedFile);
+                setCurrentPage(1);
+            } catch (err) {
+                setError(err.message);
+            } finally {
+                setLoading(false);
+            }
+        };
+        loadFileData();
+    }, [selectedFile]);
 
     const handleFileUpload = async (event) => {
         const file = event.target.files[0];
@@ -85,14 +132,15 @@ function PriceUploader() {
                 throw new Error(errData.error || 'File processing failed');
             }
 
-            const result = await response.json();
-            setData(result);
-            setSelectedCategory('All'); // Reset category filter
-            setCurrentPage(1); // Reset to first page on new data
+            // After successful upload, refresh the list of files
+            // The new file will be selected automatically by the useEffect hook
+            await fetchProcessedFiles();
+
         } catch (err) {
             setError(err.message);
         } finally {
             setLoading(false);
+            event.target.value = null; // Reset file input
         }
     };
 
@@ -141,11 +189,25 @@ function PriceUploader() {
             </header>
 
             <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
-                <div className="form-group">
-                    <label htmlFor="file-upload" className="btn btn-primary">Välj prisfil (Excel)</label>
-                    <input type="file" id="file-upload" onChange={handleFileUpload} accept=".xlsx, .xls" style={{ display: 'none' }} />
-                    {fileName && <p style={{ marginTop: '1rem' }}>Vald fil: <strong>{fileName}</strong></p>}
+                <div className="upload-section">
+                    <div className="form-group">
+                        <label htmlFor="file-upload" className="btn btn-primary">Ladda upp ny prisfil</label>
+                        <input type="file" id="file-upload" onChange={handleFileUpload} accept=".xlsx, .xls" style={{ display: 'none' }} />
+                    </div>
+                    <div className="form-group">
+                        <label htmlFor="file-select">Eller välj en befintlig prislista</label>
+                        <select id="file-select" value={selectedFile} onChange={e => setSelectedFile(e.target.value)} disabled={processedFiles.length === 0}>
+                            {processedFiles.length > 0 ? (
+                                processedFiles.map(f => <option key={f} value={f}>{f}</option>)
+                            ) : (
+                                <option>Inga prislistor hittades</option>
+                            )}
+                        </select>
+                    </div>
                 </div>
+                
+                {fileName && <p style={{ marginTop: '1rem', textAlign: 'center' }}>Visar data från: <strong>{fileName}</strong></p>}
+
 
                 {loading && <div className="loading"><div className="spinner"></div><p>Bearbetar fil...</p></div>}
                 {error && <div className="alert alert-danger">{error}</div>}

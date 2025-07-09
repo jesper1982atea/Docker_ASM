@@ -169,6 +169,15 @@ function PriceDetailPage() {
         'Pall Antal': productData['Pallet Qty'],
     };
 
+    const specDetails = {
+        'Skärmstorlek': productData['Screen Size'],
+        'Produktlinje': productData['Product Line'],
+        'Processor': productData['Processor'],
+        'Minne (RAM)': productData['RAM'],
+        'Lagring': productData['Storage'],
+        'Färg': productData['Color'],
+    };
+
     return (
         <div className="container">
             <header className="atea-header">
@@ -193,6 +202,17 @@ function PriceDetailPage() {
                             <div className="detail-item" style={{paddingTop: '1rem', borderTop: '1px solid var(--border-color)', marginTop: '1rem'}}>
                                 <div className="detail-label">Kategori</div>
                                 <div className="detail-value">{productData['Category'] || 'N/A'}</div>
+                            </div>
+                        </div>
+                        <div className="card">
+                            <h3>Specifikationer</h3>
+                            <div className="detail-grid-condensed">
+                                {Object.entries(specDetails).map(([key, value]) => (
+                                    value && <div className="detail-item" key={key}>
+                                        <div className="detail-label">{key}</div>
+                                        <div className="detail-value">{renderValue(value)}</div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                         <div className="card">

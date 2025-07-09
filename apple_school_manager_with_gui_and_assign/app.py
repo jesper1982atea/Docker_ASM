@@ -30,6 +30,8 @@ api = Api(app, title="Apple School Manager API", version="1.0", description="API
 
 CUSTOMERS_DIR = os.path.join(os.path.dirname(__file__), "admin_api", "customers")
 PRICE_UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "price_uploads")
+RAW_PRICE_DIR = os.path.join(PRICE_UPLOADS_DIR, "raw")
+PROCESSED_PRICE_DIR = os.path.join(PRICE_UPLOADS_DIR, "processed")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 JS_DIR = os.path.join(FRONTEND_DIR, "js")
 
@@ -38,8 +40,8 @@ _asm_instance_cache = {}
 _cache_lock = threading.Lock()
 
 def setup_price_uploads_dir():
-    if not os.path.exists(PRICE_UPLOADS_DIR):
-        os.makedirs(PRICE_UPLOADS_DIR)
+    os.makedirs(RAW_PRICE_DIR, exist_ok=True)
+    os.makedirs(PROCESSED_PRICE_DIR, exist_ok=True)
 
 def get_asm_instance(customer_id):
     """Get ASM instance with caching to avoid multiple token requests"""
@@ -346,10 +348,40 @@ api.add_namespace(sales_ns, path='/api/sales')
 # --- New Price List API Namespace ---
 price_ns = Namespace('price', description='Apple Price List Data Endpoints')
 
+@price_ns.route('/list')
+class PriceList(Resource):
+    def get(self):
+        """Lists all available processed price list JSON files."""
+        setup_price_uploads_dir()
+        try:
+            files = sorted(
+                [f for f in os.listdir(PROCESSED_PRICE_DIR) if f.endswith('.json')],
+                reverse=True
+            )
+            return jsonify(files)
+        except FileNotFoundError:
+            return jsonify([])
+
+@price_ns.route('/data/<string:filename>')
+class PriceData(Resource):
+    def get(self, filename):
+        """Gets the content of a processed price list JSON file."""
+        setup_price_uploads_dir()
+        filepath = os.path.join(PROCESSED_PRICE_DIR, secure_filename(filename))
+        if not os.path.exists(filepath):
+            return {'error': 'File not found'}, 404
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            return jsonify(data)
+        except Exception as e:
+            logger.error(f"Error reading processed price file {filename}: {e}")
+            return {'error': 'Could not read file'}, 500
+
 @price_ns.route('/upload')
 class PriceUpload(Resource):
     def post(self):
-        """Parses an uploaded Apple price list Excel file and saves it."""
+        """Parses an uploaded Apple price list Excel file, saves it, and saves a processed JSON version."""
         if 'file' not in request.files:
             return {'error': 'No file part in the request'}, 400
         
@@ -359,26 +391,32 @@ class PriceUpload(Resource):
 
         if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
             try:
-                # Save the file with a timestamp
+                # --- Save Raw File ---
                 today = datetime.date.today().strftime("%Y-%m-%d")
                 original_filename = secure_filename(file.filename)
                 filename_base, file_extension = os.path.splitext(original_filename)
-                new_filename = f"{filename_base}_{today}{file_extension}"
-                save_path = os.path.join(PRICE_UPLOADS_DIR, new_filename)
+                new_raw_filename = f"{filename_base}_{today}{file_extension}"
+                save_path = os.path.join(RAW_PRICE_DIR, new_raw_filename)
                 
-                # Since file.stream can be read only once, we save the file first
-                # and then parse the saved file.
+                file.stream.seek(0) # Reset stream before saving
                 file.save(save_path)
-                logger.info(f"Saved uploaded price file to {save_path}")
+                logger.info(f"Saved raw price file to {save_path}")
 
-                # Now parse the saved file for the frontend preview
-                with open(save_path, 'rb') as saved_file:
-                    data, error = parse_price_excel(saved_file)
+                # --- Process and Save JSON ---
+                file.stream.seek(0) # Reset stream for parsing
+                data, error = parse_price_excel(file.stream)
                 
                 if error:
-                    logger.error(f"Failed to parse saved file {save_path}: {error}")
+                    logger.error(f"Failed to parse uploaded file {original_filename}: {error}")
                     return {'error': f'Failed to parse file: {error}'}, 500
                 
+                json_filename = f"{filename_base}_{today}.json"
+                json_filepath = os.path.join(PROCESSED_PRICE_DIR, json_filename)
+                
+                with open(json_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(data, f)
+                logger.info(f"Saved processed price JSON to {json_filepath}")
+
                 return jsonify(data)
             except Exception as e:
                 logger.error(f"Error during price file upload and processing: {e}")
