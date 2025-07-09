@@ -1,5 +1,65 @@
 const { useState, useEffect } = React;
 
+function PriceAnalysisBlock({ priceInfo, discountMap, discountLoading }) {
+    const { cost, sales, actualCost, category } = priceInfo;
+
+    const rebateRate = discountMap.get(category) || 0;
+    const discountedAlp = cost * (1 - rebateRate);
+    const diff = actualCost - discountedAlp;
+    const diffPercent = cost !== 0 ? (diff / cost) * 100 : 0;
+
+    const marginActual = sales - actualCost;
+    const marginPercentActual = sales !== 0 ? (marginActual / sales) * 100 : 0;
+
+    return (
+        <div>
+            <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                <div className="detail-item price-box">
+                    <span className="detail-label">Försäljningspris (Kund)</span>
+                    <span className="detail-value">{sales.toFixed(2)} SEK</span>
+                </div>
+                <div className="detail-item price-box">
+                    <span className="detail-label">Faktiskt inköpspris</span>
+                    <span className="detail-value">{actualCost.toFixed(2)} SEK</span>
+                </div>
+                <div className="detail-item price-box final-price">
+                    <span className="detail-label">Faktisk marginal</span>
+                    <span className="detail-value" style={{ color: marginActual < 0 ? 'var(--atea-red)' : 'var(--atea-green)' }}>
+                        {marginActual.toFixed(2)} SEK ({marginPercentActual.toFixed(2)}%)
+                    </span>
+                </div>
+            </div>
+            <div style={{borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1.5rem'}}>
+                <h4 style={{marginTop: 0}}>Rabattanalys vs. Prislista</h4>
+                {discountLoading ? (
+                    <div className="loading"><div className="spinner-small"></div><p>Laddar rabatt...</p></div>
+                ) : (
+                    <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
+                        <div className="detail-item price-box">
+                            <span className="detail-label">Listpris (ALP Ex VAT)</span>
+                            <span className="detail-value">{cost.toFixed(2)} SEK</span>
+                        </div>
+                        <div className="detail-item price-box">
+                            <span className="detail-label">Rabatt ({(rebateRate * 100).toFixed(1)}%)</span>
+                            <span className="detail-value" style={{color: 'var(--atea-red)'}}>-{(cost * rebateRate).toFixed(2)} SEK</span>
+                        </div>
+                        <div className="detail-item price-box">
+                            <span className="detail-label">Beräknat inköpspris</span>
+                            <span className="detail-value">{discountedAlp.toFixed(2)} SEK</span>
+                        </div>
+                        <div className="detail-item price-box" style={{ background: Math.abs(diffPercent) > 1 ? 'var(--atea-light-yellow)' : 'var(--atea-light-green)'}}>
+                            <span className="detail-label">Diff vs. faktiskt inköp</span>
+                            <span className="detail-value" style={{ color: diff !== 0 ? 'var(--atea-orange)' : 'inherit' }}>
+                                {diff.toFixed(2)} SEK ({diffPercent.toFixed(2)}%)
+                            </span>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function SalesOrderDetailPage() {
     const [orderData, setOrderData] = useState(null);
     const [gsxDetails, setGsxDetails] = useState(null);
@@ -13,6 +73,12 @@ function SalesOrderDetailPage() {
     const [selectedPriceList, setSelectedPriceList] = useState('');
     const [priceInfo, setPriceInfo] = useState(null);
     const [priceLoading, setPriceLoading] = useState(false);
+
+    // New state for discount programs
+    const [discounts, setDiscounts] = useState([]);
+    const [selectedDiscount, setSelectedDiscount] = useState('');
+    const [discountMap, setDiscountMap] = useState(new Map());
+    const [discountLoading, setDiscountLoading] = useState(false);
 
     useEffect(() => {
         // Parse order data from URL
@@ -59,8 +125,21 @@ function SalesOrderDetailPage() {
             }
         };
 
+        // Fetch available discount programs
+        const fetchDiscounts = async () => {
+            try {
+                const res = await fetch('/api/discounts/');
+                if (!res.ok) return;
+                const files = await res.json();
+                setDiscounts(files);
+            } catch (e) {
+                console.error("Failed to fetch discounts", e);
+            }
+        };
+
         fetchCustomers();
         fetchPriceLists();
+        fetchDiscounts();
     }, []);
 
     useEffect(() => {
@@ -90,14 +169,14 @@ function SalesOrderDetailPage() {
                 if (productPriceInfo) {
                     const costPrice = parseFloat(productPriceInfo['ALP Ex VAT']);
                     const salesPrice = parseFloat(orderData['Tot Förs (SEK)']);
+                    const actualCost = parseFloat(orderData['Tot Kost (SEK)']);
 
                     if (!isNaN(costPrice) && !isNaN(salesPrice)) {
-                        const marginValue = salesPrice - costPrice;
-                        const marginPercent = salesPrice !== 0 ? (marginValue / salesPrice) * 100 : 0;
                         setPriceInfo({
-                            cost: costPrice.toFixed(2),
-                            marginValue: marginValue.toFixed(2),
-                            marginPercent: marginPercent.toFixed(2)
+                            cost: costPrice,
+                            sales: salesPrice,
+                            actualCost: actualCost,
+                            category: productPriceInfo.Category,
                         });
                     } else {
                         setPriceInfo({ cost: productPriceInfo['ALP Ex VAT'], marginValue: 'N/A', marginPercent: 'N/A' });
@@ -115,6 +194,29 @@ function SalesOrderDetailPage() {
 
         findPrice();
     }, [selectedPriceList, orderData]);
+
+    // Effect to load discount data
+    useEffect(() => {
+        if (!selectedDiscount) {
+            setDiscountMap(new Map());
+            return;
+        }
+        const loadDiscountData = async () => {
+            setDiscountLoading(true);
+            try {
+                const res = await fetch(`/api/discounts/${selectedDiscount}`);
+                if (!res.ok) throw new Error('Failed to load discount data');
+                const discountData = await res.json();
+                const newDiscountMap = new Map(discountData.map(item => [item['Product Class'], item['Rebate Rate']]));
+                setDiscountMap(newDiscountMap);
+            } catch (e) {
+                console.error("Error loading discount data", e);
+            } finally {
+                setDiscountLoading(false);
+            }
+        };
+        loadDiscountData();
+    }, [selectedDiscount]);
 
     const fetchGsxDetails = async () => {
         const serialNumber = orderData?.['Serienr'];
@@ -307,35 +409,31 @@ function SalesOrderDetailPage() {
                 {/* --- Price & Margin Information --- */}
                 <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-                        <h3 style={{ margin: 0 }}>Pris & Marginal</h3>
-                        <div className="form-group" style={{margin: 0}}>
-                            <label htmlFor="price-list-select" style={{marginRight: '1rem'}}>Prislista:</label>
-                            <select id="price-list-select" value={selectedPriceList} onChange={e => setSelectedPriceList(e.target.value)} disabled={priceLists.length === 0}>
-                                {priceLists.length > 0 ? (
-                                    priceLists.map(f => <option key={f} value={f}>{f}</option>)
-                                ) : (
-                                    <option>Inga prislistor</option>
-                                )}
-                            </select>
+                        <h3 style={{ margin: 0 }}>Pris, Marginal & Rabattanalys</h3>
+                        <div style={{display: 'flex', gap: '1rem'}}>
+                            <div className="form-group" style={{margin: 0}}>
+                                <label htmlFor="price-list-select" style={{marginRight: '1rem'}}>Prislista:</label>
+                                <select id="price-list-select" value={selectedPriceList} onChange={e => setSelectedPriceList(e.target.value)} disabled={priceLists.length === 0}>
+                                    {priceLists.length > 0 ? (
+                                        priceLists.map(f => <option key={f} value={f}>{f}</option>)
+                                    ) : (
+                                        <option>Inga prislistor</option>
+                                    )}
+                                </select>
+                            </div>
+                             <div className="form-group" style={{margin: 0}}>
+                                <label htmlFor="discount-select" style={{marginRight: '1rem'}}>Rabattprogram:</label>
+                                <select id="discount-select" value={selectedDiscount} onChange={e => setSelectedDiscount(e.target.value)} disabled={discounts.length === 0}>
+                                    <option value="">Inget</option>
+                                    {discounts.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                            </div>
                         </div>
                     </div>
                     {priceLoading ? (
                         <div className="loading"><div className="spinner-small"></div><p>Hämtar pris...</p></div>
                     ) : priceInfo ? (
-                        <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start', background: 'var(--atea-light-grey)', padding: '1rem', borderRadius: '5px' }}>
-                                <span className="detail-label">Inköpspris (ALP Ex VAT)</span>
-                                <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600' }}>{priceInfo.cost} SEK</span>
-                            </div>
-                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start', background: 'var(--atea-light-grey)', padding: '1rem', borderRadius: '5px' }}>
-                                <span className="detail-label">Marginal</span>
-                                <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600', color: priceInfo.marginValue < 0 ? 'var(--atea-red)' : 'var(--atea-green)' }}>{priceInfo.marginValue} SEK</span>
-                            </div>
-                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start', background: 'var(--atea-light-grey)', padding: '1rem', borderRadius: '5px' }}>
-                                <span className="detail-label">Marginal (%)</span>
-                                <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600', color: priceInfo.marginPercent < 0 ? 'var(--atea-red)' : 'var(--atea-green)' }}>{priceInfo.marginPercent} %</span>
-                            </div>
-                        </div>
+                        <PriceAnalysisBlock priceInfo={priceInfo} discountMap={discountMap} discountLoading={discountLoading} />
                     ) : (
                         <p>Inget pris hittades för artikelnummer <strong>{orderData['Artikelnr (tillverkare)']}</strong> i den valda prislistan.</p>
                     )}

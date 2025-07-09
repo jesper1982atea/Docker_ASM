@@ -10,10 +10,10 @@ function DiscountAdminPage() {
     const [programName, setProgramName] = useState('');
 
     const fetchDiscounts = async () => {
+        setLoading(true);
         try {
-            setLoading(true);
-            const response = await fetch('/api/discounts');
-            if (!response.ok) throw new Error('Failed to fetch discounts');
+            const response = await fetch('/api/discounts/');
+            if (!response.ok) throw new Error('Could not fetch discounts');
             const data = await response.json();
             setDiscounts(data);
         } catch (err) {
@@ -29,14 +29,11 @@ function DiscountAdminPage() {
 
     const handleFileChange = (event) => {
         const selectedFile = event.target.files[0];
-        if (!selectedFile) {
-            setPreviewData(null);
-            setProgramName('');
-            setFile(null);
-            return;
-        }
+        if (!selectedFile) return;
+
         setFile(selectedFile);
         setError('');
+        setProgramName(selectedFile.name.replace(/\.(xlsx|xls)$/i, '')); // Suggest name from filename
 
         const reader = new FileReader();
         reader.onload = (e) => {
@@ -45,29 +42,10 @@ function DiscountAdminPage() {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                // Headers are on row 3, so we skip the first 2 rows (index 0, 1)
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { range: 2 });
-
-                if (jsonData.length === 0) {
-                    setError("The selected file is empty or has an invalid format.");
-                    setPreviewData(null);
-                    return;
-                }
-
-                const firstRow = jsonData[0];
-                const progName = firstRow['Program Name'];
-                if (!progName) {
-                    setError("Could not find 'Program Name' column in the file.");
-                    setPreviewData(null);
-                    return;
-                }
-                
-                setProgramName(progName);
-                setPreviewData(jsonData);
-
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                setPreviewData(json);
             } catch (err) {
-                console.error("File parsing error:", err);
-                setError("Failed to parse the Excel file. Please ensure it's a valid format.");
+                setError('Failed to read or parse the Excel file.');
                 setPreviewData(null);
             }
         };
@@ -76,35 +54,30 @@ function DiscountAdminPage() {
 
     const handleUpload = async () => {
         if (!previewData || !programName) {
-            setError('Please select a valid file to generate a preview.');
+            setError('No data to upload or program name is missing.');
             return;
         }
         setUploading(true);
         setError('');
-        
-        const payload = {
-            program_name: programName,
-            data: previewData
-        };
-
         try {
+            const payload = {
+                program_name: programName,
+                data: previewData
+            };
             const response = await fetch('/api/discounts/upload', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
             });
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.error || 'Upload failed');
+                throw new Error(errData.error || 'Failed to save discount program.');
             }
-            // Refresh list after upload
-            fetchDiscounts();
-            setFile(null); // Clear file input
-            setPreviewData(null);
+            await fetchDiscounts(); // Refresh list
+            setPreviewData(null); // Clear preview
+            setFile(null);
             setProgramName('');
-            document.getElementById('file-upload').value = null;
+            document.getElementById('file-upload').value = null; // Reset file input
         } catch (err) {
             setError(err.message);
         } finally {
@@ -112,16 +85,16 @@ function DiscountAdminPage() {
         }
     };
 
-    const handleDelete = async (programName) => {
-        if (!confirm(`Are you sure you want to delete ${programName}?`)) return;
+    const handleDelete = async (programNameToDelete) => {
+        if (!confirm(`Are you sure you want to delete ${programNameToDelete}?`)) return;
 
         try {
-            const response = await fetch(`/api/discounts/${programName}`, {
+            const response = await fetch(`/api/discounts/${programNameToDelete}`, {
                 method: 'DELETE',
             });
             if (!response.ok) throw new Error('Failed to delete file');
             // Refresh list
-            setDiscounts(discounts.filter(d => d !== programName));
+            await fetchDiscounts();
         } catch (err) {
             setError(err.message);
         }
@@ -147,14 +120,24 @@ function DiscountAdminPage() {
                     <h3>Ladda upp nytt rabattprogram</h3>
                     <p>Välj en Excel-fil för att förhandsgranska och ladda upp.</p>
                     <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginTop: '1rem' }}>
-                        <input type="file" id="file-upload" accept=".xlsx, .xls" onChange={handleFileChange} />
+                        <input type="file" id="file-upload" accept=".xlsx, .xls" onChange={handleFileChange} className="form-control" />
                     </div>
                     {error && <p className="alert alert-danger" style={{ marginTop: '1rem' }}>{error}</p>}
                 </div>
 
                 {previewData && (
                     <div className="card" style={{ marginTop: '2rem' }}>
-                        <h3>Förhandsgranskning: {programName}</h3>
+                        <h3>Förhandsgranskning</h3>
+                        <div className="form-group" style={{margin: '1rem 0'}}>
+                            <label htmlFor="program-name">Programnamn</label>
+                            <input 
+                                type="text" 
+                                id="program-name" 
+                                value={programName} 
+                                onChange={e => setProgramName(e.target.value)}
+                                placeholder="Ange ett namn för rabattprogrammet"
+                            />
+                        </div>
                         <div className="table-responsive" style={{ maxHeight: '400px', overflowY: 'auto' }}>
                             <table className="table">
                                 <thead>
@@ -188,6 +171,23 @@ function DiscountAdminPage() {
                     ) : discounts.length > 0 ? (
                         <ul className="item-list">
                             {discounts.map(program => (
+                                <li key={program} className="item-list-item">
+                                    <span>{program}</span>
+                                    <button onClick={() => handleDelete(program)} className="btn btn-danger btn-sm">Ta bort</button>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>Inga rabattprogram har laddats upp.</p>
+                    )}
+                </div>
+            </main>
+        </div>
+    );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<DiscountAdminPage />);
                                 <li key={program} className="item-list-item">
                                     <span>{program}</span>
                                     <button onClick={() => handleDelete(program)} className="btn btn-danger btn-sm">Ta bort</button>

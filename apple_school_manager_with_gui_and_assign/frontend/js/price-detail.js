@@ -3,14 +3,12 @@ const { useState, useEffect } = React;
 function PriceDetailPage() {
     const [productData, setProductData] = useState(null);
     const [error, setError] = useState('');
-    const [customerPrice, setCustomerPrice] = useState('');
-    const [marginPercent, setMarginPercent] = useState('');
+    
+    // New state for discounts
     const [discounts, setDiscounts] = useState([]);
     const [selectedDiscount, setSelectedDiscount] = useState('');
-    const [discountData, setDiscountData] = useState(null);
-    const [residualValuePercent, setResidualValuePercent] = useState('');
-    const [leaseTerm, setLeaseTerm] = useState(36);
-    const [paymentModel, setPaymentModel] = useState('monthly'); // 'monthly' or 'circular'
+    const [discountMap, setDiscountMap] = useState(new Map());
+    const [loadingDiscounts, setLoadingDiscounts] = useState(false);
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -29,154 +27,65 @@ function PriceDetailPage() {
         // Fetch available discount programs
         const fetchDiscounts = async () => {
             try {
-                const res = await fetch('/api/discounts');
-                if (res.ok) {
-                    const data = await res.json();
-                    setDiscounts(data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch discounts", err);
+                const res = await fetch('/api/discounts/');
+                if (!res.ok) throw new Error('Could not fetch discounts');
+                const discountList = await res.json();
+                setDiscounts(discountList);
+            } catch (e) {
+                console.error("Failed to fetch discounts", e);
             }
         };
         fetchDiscounts();
     }, []);
 
-    useEffect(() => {
-        if (paymentModel === 'circular') {
-            setLeaseTerm(36);
-        }
-    }, [paymentModel]);
-
+    // Effect to load selected discount data
     useEffect(() => {
         if (!selectedDiscount) {
-            setDiscountData(null);
+            setDiscountMap(new Map());
             return;
         }
-        const fetchDiscountData = async () => {
+        const loadDiscountData = async () => {
+            setLoadingDiscounts(true);
             try {
                 const res = await fetch(`/api/discounts/${selectedDiscount}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setDiscountData(data);
-                } else {
-                    const errData = await res.json();
-                    setError(`Error loading discount: ${errData.error}`);
-                    setDiscountData(null);
-                }
-            } catch (err) {
-                console.error("Failed to fetch discount data", err);
-                setError("Failed to fetch discount data.");
-                setDiscountData(null);
+                if (!res.ok) throw new Error(`Failed to load discount data for ${selectedDiscount}`);
+                const discountData = await res.json();
+                const newDiscountMap = new Map(discountData.map(item => [item['Product Class'], item['Rebate Rate']]));
+                setDiscountMap(newDiscountMap);
+            } catch (e) {
+                console.error(e);
+                setError(`Error loading discount: ${e.message}`);
+                setDiscountMap(new Map());
+            } finally {
+                setLoadingDiscounts(false);
             }
         };
-        fetchDiscountData();
+        loadDiscountData();
     }, [selectedDiscount]);
 
     if (error) {
-        return <div className="container"><h1>{error}</h1></div>;
+        return <div className="container"><h1>Error</h1><p>{error}</p></div>;
     }
 
     if (!productData) {
         return <div className="container"><h1>Loading...</h1></div>;
     }
 
-    const formatNumber = (num) => {
-        if (isNaN(num) || num === null) return '0.00';
-        return num.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    };
+    const {
+        'Part Number': partNumber,
+        Description,
+        'ALP Ex VAT': alpExVat,
+        Category,
+        'Product Line': productLine,
+        'Screen Size': screenSize,
+        RAM,
+        Storage,
+        Color,
+        Processor
+    } = productData;
 
-    const basePrice = parseFloat(String(productData['ALP Ex VAT']).replace(',', '.')) || 0;
-    const productCategory = productData['Category'];
-    
-    // New discount logic: Match productData.Category with discountData[ProductClass]
-    const appliedDiscountRate = (discountData && productCategory && discountData[productCategory]) ? discountData[productCategory] : 0;
-    const discountedBasePrice = basePrice * (1 - appliedDiscountRate);
-    const appliedDiscountPercent = appliedDiscountRate * 100;
-
-    const handleCustomerPriceChange = (e) => {
-        const newPriceStr = e.target.value;
-        setCustomerPrice(newPriceStr);
-
-        const newPriceNum = parseFloat(String(newPriceStr).replace(',', '.')) || 0;
-        if (newPriceNum > 0 && discountedBasePrice > 0 && newPriceNum >= discountedBasePrice) {
-            const profit = newPriceNum - discountedBasePrice;
-            const newMargin = (profit / newPriceNum) * 100;
-            setMarginPercent(newMargin.toFixed(2));
-        } else {
-            setMarginPercent('');
-        }
-    };
-
-    const handleMarginChange = (e) => {
-        const newMarginStr = e.target.value;
-        setMarginPercent(newMarginStr);
-
-        const newMarginNum = parseFloat(newMarginStr) || 0;
-        if (newMarginNum > 0 && newMarginNum < 100 && discountedBasePrice > 0) {
-            const newPrice = discountedBasePrice / (1 - (newMarginNum / 100));
-            setCustomerPrice(newPrice.toFixed(2));
-        } else if (newMarginNum === 0) {
-            setCustomerPrice(discountedBasePrice.toFixed(2));
-        } else {
-            setCustomerPrice('');
-        }
-    };
-
-    const handleResidualValueChange = (e) => {
-        const newResidualStr = e.target.value;
-        setResidualValuePercent(newResidualStr);
-    };
-
-    const customerPriceNum = parseFloat(String(customerPrice).replace(',', '.')) || 0;
-    const profitSEK = (customerPriceNum > 0 && discountedBasePrice > 0 && customerPriceNum >= discountedBasePrice) ? customerPriceNum - discountedBasePrice : 0;
-    const displayMargin = (customerPriceNum > 0 && discountedBasePrice > 0 && customerPriceNum >= discountedBasePrice) ? (profitSEK / customerPriceNum) * 100 : 0;
-
-    const residualValueNum = parseFloat(residualValuePercent) || 0;
-    const residualValueSEK = customerPriceNum * (residualValueNum / 100);
-    const finalPrice = customerPriceNum - residualValueSEK;
-    const monthlyPrice = finalPrice > 0 ? finalPrice / leaseTerm : 0;
-
-    const renderValue = (value) => {
-        if (typeof value === 'boolean') {
-            return value ? 'Ja' : 'Nej';
-        }
-        if (value === '' || value === null || value === undefined || Number.isNaN(value)) {
-            return <span style={{color: 'var(--atea-grey)'}}>N/A</span>;
-        }
-        return String(value);
-    };
-
-    const keyDetails = {
-        'Part Number': productData['Part Number'],
-        'UPC/EAN': productData['UPC/EAN'],
-        'Marketing Flag': productData['Marketing Flag'],
-        'NPI': productData['NPI'],
-        'Reprice Indicator': productData['Reprice Indicator'],
-        'Copyright Levy': productData['Copyright Levy'],
-        'Country of Origin': productData['COO'],
-    };
-
-    const physicalDetails = {
-        'Vikt (kg)': productData['Weight(kg)'],
-        'Mått (cm)': `${renderValue(productData['Length(cm)'])} x ${renderValue(productData['Width(cm)'])} x ${renderValue(productData['Height(cm)'])}`,
-        'Vikt (PCE, kg)': productData['Weight(kg) - PCE'],
-        'Mått (PCE, cm)': `${renderValue(productData['Length(cm) - PCE'])} x ${renderValue(productData['Width(cm) - PCE'])} x ${renderValue(productData['Height(cm) - PCE'])}`,
-    };
-
-    const packagingDetails = {
-        'Multi-pack Antal': productData['Multi pack Qty'],
-        'Master Pack Antal': productData['Master Pack Qty'],
-        'Pall Antal': productData['Pallet Qty'],
-    };
-
-    const specDetails = {
-        'Skärmstorlek': productData['Screen Size'],
-        'Produktlinje': productData['Product Line'],
-        'Processor': productData['Processor'],
-        'Minne (RAM)': productData['RAM'],
-        'Lagring': productData['Storage'],
-        'Färg': productData['Color'],
-    };
+    const rebateRate = discountMap.get(Category) || 0;
+    const discountedPrice = parseFloat(alpExVat) * (1 - rebateRate);
 
     return (
         <div className="container">
@@ -184,8 +93,8 @@ function PriceDetailPage() {
                 <div className="header-content">
                     <a href="/frontend/"><img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
                     <div>
-                        <h1>Produktdatablad</h1>
-                        <p>{productData['Part Number']} - {productData['Description']}</p>
+                        <h1>{Description || 'Product Details'}</h1>
+                        <p>Part Number: {partNumber}</p>
                     </div>
                 </div>
                 <div className="header-links">
@@ -194,237 +103,50 @@ function PriceDetailPage() {
             </header>
 
             <main style={{ marginTop: '2rem' }}>
-                <div className="product-sheet-grid">
-                    <div className="product-details-main">
-                        <div className="card">
-                            <h3>{productData['Description']}</h3>
-                            <p>{productData['SAP Part Description']}</p>
-                            <div className="detail-item" style={{paddingTop: '1rem', borderTop: '1px solid var(--border-color)', marginTop: '1rem'}}>
-                                <div className="detail-label">Kategori</div>
-                                <div className="detail-value">{productData['Category'] || 'N/A'}</div>
-                            </div>
-                        </div>
-                        <div className="card">
-                            <h3>Specifikationer</h3>
-                            <div className="detail-grid-condensed">
-                                {Object.entries(specDetails).map(([key, value]) => (
-                                    value && <div className="detail-item" key={key}>
-                                        <div className="detail-label">{key}</div>
-                                        <div className="detail-value">{renderValue(value)}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="card">
-                            <h3>Nyckelinformation</h3>
-                            <div className="detail-grid-condensed">
-                                {Object.entries(keyDetails).map(([key, value]) => (
-                                    <div className="detail-item" key={key}>
-                                        <div className="detail-label">{key}</div>
-                                        <div className="detail-value">{renderValue(value)}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="card">
-                            <h3>Fysiska Egenskaper</h3>
-                             <div className="detail-grid-condensed">
-                                {Object.entries(physicalDetails).map(([key, value]) => (
-                                    <div className="detail-item" key={key}>
-                                        <div className="detail-label">{key}</div>
-                                        <div className="detail-value">{value}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                         <div className="card">
-                            <h3>Förpackningsinformation</h3>
-                             <div className="detail-grid-condensed">
-                                {Object.entries(packagingDetails).map(([key, value]) => (
-                                    <div className="detail-item" key={key}>
-                                        <div className="detail-label">{key}</div>
-                                        <div className="detail-value">{renderValue(value)}</div>
-                                    </div>
-                                ))}
-                            </div>
+                <div className="card" style={{ padding: '2rem' }}>
+                    <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>Produktdetaljer</h3>
+                    <div className="detail-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+                        <div className="detail-item"><span className="detail-label">Part Number</span><span className="detail-value">{partNumber}</span></div>
+                        <div className="detail-item"><span className="detail-label">Category</span><span className="detail-value">{Category}</span></div>
+                        <div className="detail-item"><span className="detail-label">Product Line</span><span className="detail-value">{productLine || 'N/A'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Processor</span><span className="detail-value">{Processor || 'N/A'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Screen Size</span><span className="detail-value">{screenSize || 'N/A'}</span></div>
+                        <div className="detail-item"><span className="detail-label">RAM</span><span className="detail-value">{RAM || 'N/A'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Storage</span><span className="detail-value">{Storage || 'N/A'}</span></div>
+                        <div className="detail-item"><span className="detail-label">Color</span><span className="detail-value">{Color || 'N/A'}</span></div>
+                    </div>
+                </div>
+
+                <div className="card" style={{ padding: '2rem', marginTop: '2rem' }}>
+                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
+                        <h3 style={{ margin: 0 }}>Pris & Rabatt</h3>
+                        <div className="form-group" style={{margin: 0}}>
+                            <label htmlFor="discount-select" style={{marginRight: '1rem'}}>Rabattprogram:</label>
+                            <select id="discount-select" value={selectedDiscount} onChange={e => setSelectedDiscount(e.target.value)} disabled={discounts.length === 0}>
+                                <option value="">Ingen rabatt</option>
+                                {discounts.map(d => <option key={d} value={d}>{d}</option>)}
+                            </select>
                         </div>
                     </div>
-                    <div className="price-calculator-module">
-                        <div className="card">
-                            <h3>Priskalkylator</h3>
-                            <div className="price-item">
-                                <label>Välj rabattprogram</label>
-                                <select value={selectedDiscount} onChange={e => setSelectedDiscount(e.target.value)}>
-                                    <option value="">Inget rabattprogram</option>
-                                    {discounts.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
+                    
+                    {loadingDiscounts ? (
+                         <div className="loading"><div className="spinner-small"></div><p>Laddar rabatt...</p></div>
+                    ) : (
+                        <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                            <div className="detail-item price-box">
+                                <span className="detail-label">Listpris (ALP Ex VAT)</span>
+                                <span className="detail-value">{parseFloat(alpExVat).toFixed(2)} SEK</span>
                             </div>
-                            <div className="price-item">
-                                <label>Inköpspris (ALP Ex. moms)</label>
-                                <div className="price-value" style={{ textDecoration: appliedDiscountRate > 0 ? 'line-through' : 'none' }}>
-                                    {formatNumber(basePrice)} kr
-                                </div>
+                            <div className="detail-item price-box">
+                                <span className="detail-label">Rabatt ({selectedDiscount || 'N/A'})</span>
+                                <span className="detail-value" style={{color: 'var(--atea-red)'}}>-{(rebateRate * 100).toFixed(2)}%</span>
                             </div>
-                            {appliedDiscountRate > 0 && (
-                                <div className="price-item" style={{color: 'var(--atea-green)'}}>
-                                    <label>Rabatterat inköpspris ({appliedDiscountPercent.toFixed(2)}% rabatt på kategori '{productCategory}')</label>
-                                    <div className="price-value" style={{fontWeight: 'bold'}}>{formatNumber(discountedBasePrice)} kr</div>
-                                </div>
-                            )}
-                            
-                            <div className="price-item">
-                                <label htmlFor="customer-price">Ange kundpris (Ex. moms)</label>
-                                <input
-                                    type="number"
-                                    id="customer-price"
-                                    value={customerPrice}
-                                    onChange={handleCustomerPriceChange}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                />
-                            </div>
-
-                            <div className="price-item">
-                                <label htmlFor="margin-percent">Ange marginal (%)</label>
-                                <input
-                                    type="number"
-                                    id="margin-percent"
-                                    value={marginPercent}
-                                    onChange={handleMarginChange}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    max="99.99"
-                                />
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="50"
-                                    step="0.5"
-                                    value={marginPercent || 0}
-                                    onChange={handleMarginChange}
-                                    style={{marginTop: '0.5rem'}}
-                                />
-                            </div>
-
-                            <div className="price-item">
-                                <label htmlFor="residual-value-percent">Ange restvärde (%)</label>
-                                <input
-                                    type="number"
-                                    id="residual-value-percent"
-                                    value={residualValuePercent}
-                                    onChange={handleResidualValueChange}
-                                    placeholder="0.00"
-                                    step="0.01"
-                                    max="99.99"
-                                />
-                                <input
-                                    type="range"
-                                    min="0"
-                                    max="50"
-                                    step="0.5"
-                                    value={residualValuePercent || 0}
-                                    onChange={handleResidualValueChange}
-                                    style={{marginTop: '0.5rem'}}
-                                />
-                            </div>
-
-                            <div className="price-item">
-                                <label>Välj betalningsmodell</label>
-                                <div className="term-selector">
-                                    <button
-                                        className={`term-btn ${paymentModel === 'monthly' ? 'active' : ''}`}
-                                        onClick={() => setPaymentModel('monthly')}
-                                    >
-                                        Månadskostnad
-                                    </button>
-                                    <button
-                                        className={`term-btn ${paymentModel === 'circular' ? 'active' : ''}`}
-                                        onClick={() => setPaymentModel('circular')}
-                                    >
-                                        Circular Choice
-                                    </button>
-                                </div>
-                            </div>
-
-                            {paymentModel === 'monthly' && (
-                                <div className="price-item">
-                                    <label>Välj avtalsperiod</label>
-                                    <div className="term-selector">
-                                        {[24, 36, 48].map(term => (
-                                            <button
-                                                key={term}
-                                                className={`term-btn ${leaseTerm === term ? 'active' : ''}`}
-                                                onClick={() => setLeaseTerm(term)}
-                                            >
-                                                {term} mån
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="price-summary">
-                                <div className="summary-section">
-                                    <h4 className="summary-header">Prisberäkning</h4>
-                                    <div className="summary-row">
-                                        <span>Rabatterat inköpspris</span>
-                                        <span className="value">{formatNumber(discountedBasePrice)} kr</span>
-                                    </div>
-                                    <div className="summary-row">
-                                        <span>Vinst</span>
-                                        <span className={`value ${profitSEK > 0 ? 'profit' : ''}`}>{formatNumber(profitSEK)} kr</span>
-                                    </div>
-                                    <div className="summary-row">
-                                        <span>Marginal</span>
-                                        <span className={`value ${displayMargin > 0 ? 'profit' : ''}`}>{formatNumber(displayMargin)} %</span>
-                                    </div>
-                                </div>
-
-                                <div className="summary-section">
-                                    <h4 className="summary-header">Kundens Pris</h4>
-                                    <div className="summary-row">
-                                        <span>Pris till kund (Ex. moms)</span>
-                                        <span className="value">{formatNumber(customerPriceNum)} kr</span>
-                                    </div>
-                                    <div className="summary-row">
-                                        <span>Restvärde ({residualValueNum}%)</span>
-                                        <span className="value">- {formatNumber(residualValueSEK)} kr</span>
-                                    </div>
-                                    <div className="summary-row total">
-                                        <span>Kundens totala kostnad</span>
-                                        <span className="value">{formatNumber(finalPrice)} kr</span>
-                                    </div>
-                                </div>
-
-                                {paymentModel === 'monthly' ? (
-                                    <div className="summary-section monthly">
-                                         <div className="summary-row monthly-price">
-                                            <span>Pris per månad ({leaseTerm} mån)</span>
-                                            <span className="value">{formatNumber(monthlyPrice)} kr</span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="summary-section circular">
-                                        <h4 className="summary-header">Circular Choice (36 mån)</h4>
-                                        <div className="summary-row">
-                                            <span>Första betalning (vid start)</span>
-                                            <span className="value">{formatNumber(finalPrice)} kr</span>
-                                        </div>
-                                        <div className="summary-row">
-                                            <span>Andra betalning (om du behåller produkten)</span>
-                                            <span className="value">{formatNumber(residualValueSEK)} kr</span>
-                                        </div>
-                                        <hr />
-                                        <div className="summary-row total">
-                                            <span>Total kostnad (om du behåller produkten)</span>
-                                            <span className="value">{formatNumber(customerPriceNum)} kr</span>
-                                        </div>
-                                        <p className="summary-note">Om produkten returneras efter 36 månader utgår den andra betalningen.</p>
-                                    </div>
-                                )}
+                            <div className="detail-item price-box final-price">
+                                <span className="detail-label">Pris efter rabatt</span>
+                                <span className="detail-value">{discountedPrice.toFixed(2)} SEK</span>
                             </div>
                         </div>
-                    </div>
+                    )}
                 </div>
             </main>
         </div>
