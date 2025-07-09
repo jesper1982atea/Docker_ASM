@@ -95,20 +95,21 @@ function DiscountAdminPage() {
 
     const handleUpload = async () => {
         if (!file) {
-            setError('Ingen fil vald för uppladdning.');
+            setError('Välj en fil att ladda upp.');
             return;
         }
-        if (!programName || !previewData) {
-            setError('Programnamn och förhandsgranskad data får inte vara tom.');
-            return;
-        }
+        // The program name is now derived from the file on the backend, so no need to check it here.
+
         setUploading(true);
         setError('');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
         try {
             const response = await fetch('/api/discounts/upload', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ program_name: programName, data: previewData }),
+                body: formData, // Send the file as multipart/form-data
             });
             if (!response.ok) {
                 const errData = await response.json();
@@ -119,6 +120,7 @@ function DiscountAdminPage() {
             setPreviewData(null);
             setProgramName('');
             fetchDiscounts();
+            alert('Rabattprogrammet har laddats upp!');
         } catch (err) {
             setError(err.message);
         } finally {
