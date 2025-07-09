@@ -14,7 +14,7 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
         const newMarginValue = newSalesPrice - discountedAlp;
         
         const residualValueAmount = newSalesPrice * (residualValuePercent / 100);
-        const financingAmount = newSalesPrice - residualValueAmount;
+        const financingAmount = newSalesPrice - residualValueAmount; // This is the amount the customer pays over the lease period
         const monthlyCost = leasePeriodMonths > 0 ? financingAmount / leasePeriodMonths : 0;
 
         return {
@@ -22,6 +22,8 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
             marginValue: newMarginValue,
             marginPercent: targetMarginPercent,
             monthlyCost: monthlyCost,
+            financingAmount: financingAmount,
+            residualValueAmount: residualValueAmount
         };
     }, [discountedAlp, targetMarginPercent, residualValuePercent, leasePeriodMonths]);
 
@@ -80,6 +82,10 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
                             <span className="detail-label">Månadskostnad för kund</span>
                             <span className="detail-value">{newDeal.monthlyCost.toFixed(2)} SEK/mån</span>
                         </div>
+                    </div>
+                    <div className="info-box" style={{marginTop: '1rem', padding: '0.75rem', background: 'var(--atea-light-blue)', borderRadius: '5px', fontSize: '0.85rem'}}>
+                        Månadskostnaden baseras på ett finansierat belopp på <strong>{newDeal.financingAmount.toFixed(2)} SEK</strong> (Försäljningspris - Restvärde).
+                        Restvärdet på <strong>{newDeal.residualValueAmount.toFixed(2)} SEK</strong> förutsätter att enheten återlämnas i avtalat skick.
                     </div>
                 </div>
             )}
