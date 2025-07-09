@@ -51,31 +51,48 @@ function DiscountAdminPage() {
         const f = event.target.files[0];
         if (!f) return;
         setFile(f);
+        setError(''); // Clear previous errors
         
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
+                console.log("DEBUG: FileReader har läst filen.");
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
+                console.log("DEBUG: Excel-filen har tolkats till ett 'workbook'-objekt:", workbook);
+
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
+                console.log(`DEBUG: Använder kalkylblad: '${firstSheetName}'`);
                 
-                // Tell sheet_to_json that headers are on row 3 (index 2)
+                // Konvertera kalkylblad till JSON, med rubriker från rad 3 (index 2)
                 const json = XLSX.utils.sheet_to_json(worksheet, { header: 2 });
+                console.log("DEBUG: Rådata från Excel (som JSON):", json);
+                if (json.length === 0) {
+                    console.warn("DEBUG: Inga datarader hittades i Excel-filen efter rubrikrad 3.");
+                }
 
-                // Find the program name from the first row of data
-                const programNameFromFile = json.length > 0 ? json[0]['Program Name'] : f.name.replace(/\.(xlsx|xls)$/, '');
+                // Hämta programnamnet från första raden med data
+                const programNameFromFile = json.length > 0 && json[0]['Program Name'] ? json[0]['Program Name'] : f.name.replace(/\.(xlsx|xls)$/, '');
                 setProgramName(programNameFromFile);
+                console.log("DEBUG: Programnamn satt till:", programNameFromFile);
 
                 const sanitizedData = json
-                    .filter(row => row['Product Class'] && row['Rebate Rate (%)'] !== undefined)
+                    .filter(row => {
+                        const hasProductClass = row['Product Class'];
+                        const hasRebateRate = row['Rebate Rate (%)'] !== undefined;
+                        // Logga rader som filtreras bort för felsökning
+                        if (!hasProductClass || !hasRebateRate) {
+                            console.log("DEBUG: Filtrerar bort rad pga saknad data:", row);
+                        }
+                        return hasProductClass && hasRebateRate;
+                    })
                     .map(row => {
                         let rate = row['Rebate Rate (%)'];
                         if (typeof rate === 'string') {
                             rate = rate.replace('%', '').trim();
                         }
                         const rateFloat = parseFloat(rate);
-                        // Convert percentage to decimal, e.g., 5 -> 0.05
                         const finalRate = !isNaN(rateFloat) ? (rateFloat > 1 ? rateFloat / 100 : rateFloat) : 0;
 
                         return {
@@ -84,10 +101,16 @@ function DiscountAdminPage() {
                         };
                     });
 
+                console.log("DEBUG: Bearbetad data för förhandsgranskning:", sanitizedData);
                 setPreviewData(sanitizedData);
+
+                if (sanitizedData.length === 0 && json.length > 0) {
+                    setError("Filen lästes in, men inga giltiga rader med både 'Product Class' och 'Rebate Rate (%)' hittades. Kontrollera kolumnrubrikerna och innehållet.");
+                }
+
             } catch (err) {
                 setError('Kunde inte läsa filen. Se till att den är i rätt format och att rubrikerna är på rad 3.');
-                console.error(err);
+                console.error("FEL vid inläsning av fil i handleFileChange:", err);
             }
         };
         reader.readAsArrayBuffer(f);
