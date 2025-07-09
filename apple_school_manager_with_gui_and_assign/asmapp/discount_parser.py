@@ -78,14 +78,17 @@ def parse_discount_excel(file_stream):
             logger.warning(f"Multiple program names found: {program_names}. Using the first one: '{program_names[0]}'.")
         program_name = str(program_names[0])
 
-        # Apply the robust conversion function to create the final 'Rebate Rate'
-        df['Rebate Rate'] = df['rebate rate (%)'].apply(_convert_rebate_rate)
+        # Apply the robust conversion function to 'rebate rate (%)'
+        df['rebate rate (%)'] = df['rebate rate (%)'].apply(_convert_rebate_rate)
         
-        # Rename 'product class' to 'Product Class' for the output dictionary
-        df.rename(columns={'product class': 'Product Class'}, inplace=True)
+        # Rename columns to a consistent Title Case format for the output
+        def to_title_case(name):
+            return ' '.join(word.capitalize() for word in name.replace('_', ' ').split())
+
+        df.columns = [to_title_case(col) for col in df.columns]
         
-        # Create the list of dictionaries from the processed DataFrame
-        data = df[['Product Class', 'Rebate Rate']].to_dict('records')
+        # Create the list of dictionaries from the entire processed DataFrame
+        data = df.to_dict('records')
         
         if not data:
             logger.error("Data became empty after converting to dictionary. This should not happen if rows exist.")
@@ -124,10 +127,8 @@ def save_discount_program_from_json(request_data, discounts_dir):
         logger.error(f"'data' is missing or not a list for program '{program_name}'.")
         return False, "No valid data rows found to save."
 
-    # Basic validation of data rows
-    if not all('Product Class' in row and 'Rebate Rate' in row for row in data):
-        logger.error(f"Data rows are missing 'Product Class' or 'Rebate Rate' for program '{program_name}'.")
-        return False, "Invalid data format: Each row must have 'Product Class' and 'Rebate Rate'."
+    # No longer need to validate specific keys, as we save whatever we get.
+    # The frontend is responsible for ensuring the data is well-formed.
 
     try:
         # Sanitize filename

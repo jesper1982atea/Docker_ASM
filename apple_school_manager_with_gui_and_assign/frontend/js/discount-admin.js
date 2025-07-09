@@ -92,20 +92,20 @@ function DiscountAdminPage() {
                 const programNameFromFile = cleanedJson.length > 0 && cleanedJson[0]['Program Name'] ? cleanedJson[0]['Program Name'] : f.name.replace(/\.(xlsx|xls)$/, '');
                 setProgramName(programNameFromFile);
 
+                // Keep all data, but ensure key columns exist for filtering
                 const sanitizedData = cleanedJson
                     .filter(row => row['Product Class'] && row['Rebate Rate (%)'] !== undefined)
                     .map(row => {
-                        let rate = row['Rebate Rate (%)'];
+                        // Create a new object to avoid modifying the raw data
+                        const newRow = {...row};
+                        let rate = newRow['Rebate Rate (%)'];
                         if (typeof rate === 'string') {
                             rate = rate.replace('%', '').trim();
                         }
                         const rateFloat = parseFloat(rate);
-                        const finalRate = !isNaN(rateFloat) ? (rateFloat > 1 ? rateFloat / 100 : rateFloat) : 0;
-
-                        return {
-                            'Product Class': row['Product Class'],
-                            'Rebate Rate': finalRate
-                        };
+                        // Overwrite the original column with the calculated decimal rate
+                        newRow['Rebate Rate (%)'] = !isNaN(rateFloat) ? (rateFloat > 1 ? rateFloat / 100 : rateFloat) : 0;
+                        return newRow;
                     });
 
                 setPreviewData(sanitizedData);
@@ -274,26 +274,31 @@ function DiscountAdminPage() {
                         <h3>Granskar program: {viewedProgramName}</h3>
                         {loadingView ? (
                             <div className="loading"><div className="spinner-small"></div><p>Laddar...</p></div>
-                        ) : viewedProgramData ? (
+                        ) : viewedProgramData && viewedProgramData.length > 0 ? (
                             <div className="table-container" style={{ marginTop: '1.5rem', maxHeight: '60vh', overflowY: 'auto' }}>
                                 <table className="table">
                                     <thead>
                                         <tr>
-                                            <th>Product Class</th>
-                                            <th>Rebate Rate</th>
+                                            {Object.keys(viewedProgramData[0]).map(key => <th key={key}>{key}</th>)}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {viewedProgramData.map((row, index) => (
                                             <tr key={index}>
-                                                <td>{row['Product Class']}</td>
-                                                <td>{(row['Rebate Rate'] * 100).toFixed(2)}%</td>
+                                                {Object.keys(row).map(key => {
+                                                    let value = row[key];
+                                                    // Format numbers that look like percentages
+                                                    if (typeof value === 'number' && value <= 1 && value >= -1) {
+                                                        value = `${(value * 100).toFixed(2)}%`;
+                                                    }
+                                                    return <td key={key}>{String(value)}</td>;
+                                                })}
                                             </tr>
                                         ))}
                                     </tbody>
                                 </table>
                             </div>
-                        ) : <p>Kunde inte ladda programdata.</p>}
+                        ) : <p>Kunde inte ladda programdata eller så är programmet tomt.</p>}
                         <button onClick={() => setViewedProgramName('')} className="btn" style={{ marginTop: '1rem' }}>Stäng</button>
                     </div>
                 </div>
@@ -370,14 +375,14 @@ function DiscountAdminPage() {
                                 <thead>
                                     <tr>
                                         <th>Product Class</th>
-                                        <th>Rebate Rate</th>
+                                        <th>Rebate Rate (%)</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {previewData.map((row, index) => (
                                         <tr key={index}>
                                             <td>{row['Product Class']}</td>
-                                            <td>{(row['Rebate Rate'] * 100).toFixed(2)}%</td>
+                                            <td>{(row['Rebate Rate (%)'] * 100).toFixed(2)}%</td>
                                         </tr>
                                     ))}
                                 </tbody>
