@@ -1,4 +1,4 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useMemo } = React;
 
 function PriceAnalysisBlock({ priceInfo, discountMap, discountLoading }) {
     const { cost, sales, actualCost, category } = priceInfo;
@@ -327,6 +327,16 @@ function SalesOrderDetailPage() {
 
     const serialNumber = orderData['Serienr'];
 
+    const productDetailData = useMemo(() => {
+        if (!priceInfo || !orderData) return null;
+        return {
+            'Part Number': orderData['Artikelnr (tillverkare)'],
+            'Description': orderData['Artikelbenämning (APA)'],
+            'Category': priceInfo.category,
+            // Add other fields if they become available in orderData or priceInfo
+        };
+    }, [orderData, priceInfo]);
+
     return (
         <div className="container">
             <header className="atea-header">
@@ -367,23 +377,29 @@ function SalesOrderDetailPage() {
                         </div>
                     </div>
 
-                    {/* Product Info */}
+                    {/* Product Info - Now using a component if priceInfo is available */}
                     <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
-                        <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Produktspecifikation</h4>
-                        <div className="detail-grid" style={{ gridTemplateColumns: '1fr', gap: '1rem' }}>
-                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                <span className="detail-label">Artikelbenämning</span>
-                                <span className="detail-value">{orderData['Artikelbenämning (APA)']}</span>
+                         {priceInfo && productDetailData ? (
+                            <window.ProductDetailView productData={productDetailData} />
+                         ) : (
+                            <div>
+                                <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Produktspecifikation</h4>
+                                <div className="detail-grid" style={{ gridTemplateColumns: '1fr', gap: '1rem' }}>
+                                    <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                        <span className="detail-label">Artikelbenämning</span>
+                                        <span className="detail-value">{orderData['Artikelbenämning (APA)']}</span>
+                                    </div>
+                                    <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                        <span className="detail-label">Serienummer</span>
+                                        <span className="detail-value" style={{ fontWeight: '600' }}>{orderData['Serienr']}</span>
+                                    </div>
+                                    <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                        <span className="detail-label">Tillverkarens artikelnr.</span>
+                                        <span className="detail-value">{orderData['Artikelnr (tillverkare)']}</span>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                <span className="detail-label">Serienummer</span>
-                                <span className="detail-value" style={{ fontWeight: '600' }}>{orderData['Serienr']}</span>
-                            </div>
-                             <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                <span className="detail-label">Tillverkarens artikelnr.</span>
-                                <span className="detail-value">{orderData['Artikelnr (tillverkare)']}</span>
-                            </div>
-                        </div>
+                         )}
                     </div>
 
                     {/* Financial Info */}
