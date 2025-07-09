@@ -73,6 +73,82 @@ function SalesOrderDetailPage() {
         }
     };
 
+    const handleExportExcel = () => {
+        if (!orderData || !gsxDetails) {
+            alert("Vänta tills all data har laddats innan du exporterar.");
+            return;
+        }
+
+        const data = [];
+
+        // Sales Information
+        data.push({ Kategori: 'Säljinformation', Egenskap: 'Kund', Värde: orderData['Kund'] });
+        data.push({ Kategori: 'Säljinformation', Egenskap: 'Ordernummer', Värde: orderData['Ordernr'] });
+        data.push({ Kategori: 'Säljinformation', Egenskap: 'Bokföringsdatum', Värde: orderData['Bokf datum'] });
+        data.push({ Kategori: 'Säljinformation', Egenskap: 'Artikelbenämning', Värde: orderData['Artikelbenämning (APA)'] });
+        data.push({ Kategori: 'Säljinformation', Egenskap: 'Serienummer', Värde: orderData['Serienr'] });
+        data.push({ Kategori: 'Säljinformation', Egenskap: 'Försäljningspris (SEK)', Värde: orderData['Tot Förs (SEK)'] });
+
+        // Spacer
+        data.push({});
+
+        // GSX General Information
+        data.push({ Kategori: 'GSX - Allmän Information', Egenskap: 'Produktbeskrivning', Värde: gsxDetails.productDescription });
+        data.push({ Kategori: 'GSX - Allmän Information', Egenskap: 'Konfiguration', Värde: gsxDetails.configDescription });
+        data.push({ Kategori: 'GSX - Allmän Information', Egenskap: 'Såld till', Värde: gsxDetails.soldToName });
+        data.push({ Kategori: 'GSX - Allmän Information', Egenskap: 'Inköpsland', Värde: `${gsxDetails.warrantyInfo?.purchaseCountryDesc} (${gsxDetails.warrantyInfo?.purchaseCountryCode})` });
+
+        // Spacer
+        data.push({});
+
+        // GSX Warranty Details
+        data.push({ Kategori: 'GSX - Garanti', Egenskap: 'Status', Värde: gsxDetails.warrantyInfo?.warrantyStatusDescription });
+        data.push({ Kategori: 'GSX - Garanti', Egenskap: 'Inköpsdatum', Värde: new Date(gsxDetails.warrantyInfo?.purchaseDate).toLocaleDateString() });
+        data.push({ Kategori: 'GSX - Garanti', Egenskap: 'Registreringsdatum', Värde: new Date(gsxDetails.warrantyInfo?.registrationDate).toLocaleDateString() });
+        data.push({ Kategori: 'GSX - Garanti', Egenskap: 'Dagar kvar', Värde: gsxDetails.warrantyInfo?.daysRemaining });
+
+        // Spacer
+        data.push({});
+
+        // GSX Activation Details
+        if (gsxDetails.activationDetails) {
+            data.push({ Kategori: 'GSX - Aktivering', Egenskap: 'Första aktivering', Värde: gsxDetails.activationDetails.firstActivationDate ? new Date(gsxDetails.activationDetails.firstActivationDate).toLocaleString() : 'N/A' });
+            data.push({ Kategori: 'GSX - Aktivering', Egenskap: 'Upplåst', Värde: gsxDetails.activationDetails.unlocked ? 'Ja' : 'Nej' });
+            data.push({ Kategori: 'GSX - Aktivering', Egenskap: 'Operatör', Värde: gsxDetails.activationDetails.carrierName || 'N/A' });
+        }
+
+        // Spacer
+        data.push({});
+
+        // GSX Identifiers
+        if (gsxDetails.identifiers) {
+            data.push({ Kategori: 'GSX - Identifierare', Egenskap: 'Serienummer', Värde: gsxDetails.identifiers.serial || orderData['Serienr'] });
+            data.push({ Kategori: 'GSX - Identifierare', Egenskap: 'IMEI', Värde: gsxDetails.identifiers.imei || 'N/A' });
+            data.push({ Kategori: 'GSX - Identifierare', Egenskap: 'IMEI 2', Värde: gsxDetails.identifiers.imei2 || 'N/A' });
+        }
+
+        // Spacer
+        data.push({});
+
+        // GSX Repair Cases
+        if (gsxDetails.caseDetails && gsxDetails.caseDetails.length > 0) {
+            gsxDetails.caseDetails.forEach((c, i) => {
+                data.push({ Kategori: 'GSX - Serviceärenden', Egenskap: `Ärende ${i + 1} ID`, Värde: c.caseId });
+                data.push({ Kategori: 'GSX - Serviceärenden', Egenskap: `Ärende ${i + 1} Skapat`, Värde: new Date(c.createdDateTime).toLocaleString() });
+                data.push({ Kategori: 'GSX - Serviceärenden', Egenskap: `Ärende ${i + 1} Sammanfattning`, Värde: c.summary });
+            });
+        }
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Enhetsdetaljer");
+
+        // Set column widths for better readability
+        worksheet["!cols"] = [{ wch: 25 }, { wch: 30 }, { wch: 40 }];
+
+        XLSX.writeFile(workbook, `Enhetsrapport_${orderData['Serienr']}.xlsx`);
+    };
+
     if (!orderData) {
         return <div className="container"><h1>{error || 'Loading...'}</h1></div>;
     }
@@ -91,6 +167,7 @@ function SalesOrderDetailPage() {
                 </div>
                 <div className="header-links">
                     <a href="/sales-upload" className="header-link">⬅️ Tillbaka till säljuppladdning</a>
+                    <button onClick={handleExportExcel} className="header-link" disabled={!gsxDetails}>Exportera till Excel</button>
                 </div>
             </header>
 
