@@ -13,124 +13,93 @@ def setup_discounts_dir():
         os.makedirs(DISCOUNTS_DIR)
 
 def list_discounts():
-    """Lists all available discount program files."""
+    """Lists all available processed discount programs (JSON files)."""
     setup_discounts_dir()
     try:
-        # List only excel files
-        return sorted([f for f in os.listdir(DISCOUNTS_DIR) if f.endswith(('.xlsx', '.xls'))])
+        # List only json files, and return their names without the extension.
+        return sorted([os.path.splitext(f)[0] for f in os.listdir(DISCOUNTS_DIR) if f.endswith('.json')])
     except FileNotFoundError:
         return []
 
-def _create_discount_json(excel_path, program_name):
-    """Parses the excel file and creates a corresponding JSON file based on Product Class."""
+def save_discount_from_data(program_name, data):
+    """
+    Processes a list of dictionaries (from JSON) and saves the discount map.
+    The data comes from the frontend preview.
+    """
+    if not program_name:
+        return None, "Program name is required"
+    if not data:
+        return None, "No data provided"
+
+    logger.info(f"Processing discount data for program: {program_name}")
+    # Log first row to see the structure and keys
+    if data:
+        logger.debug(f"First row of data received: {data[0]}")
+
     try:
-        # Headers are on row 3, so we skip first 2 rows.
-        df = pd.read_excel(excel_path, header=2)
+        discount_map = {}
         
-        # Rename columns for easier access
-        df.rename(columns={
-            'Product Class': 'ProductClass',
-            'Rebate Rate (%)': 'RebateRate'
-        }, inplace=True)
+        # Define the keys we are looking for
+        product_class_key = 'Product Class'
+        rebate_rate_key = 'Rebate Rate (%)'
 
-        # Ensure required columns exist
-        if 'ProductClass' not in df.columns or 'RebateRate' not in df.columns:
-            raise ValueError("Missing 'Product Class' or 'Rebate Rate (%)' columns in the Excel file.")
+        for row_data in data:
+            # Normalize keys by stripping whitespace
+            normalized_row = {k.strip(): v for k, v in row_data.items()}
 
-        # Drop rows where ProductClass or RebateRate is empty
-        df.dropna(subset=['ProductClass', 'RebateRate'], inplace=True)
+            product_class = normalized_row.get(product_class_key)
+            rebate_rate = normalized_row.get(rebate_rate_key)
+
+            # Skip if essential data is missing, empty, or if we already have this class
+            if not product_class or rebate_rate is None or product_class in discount_map:
+                continue
+
+            try:
+                # Convert rebate rate to a numeric value and then to a decimal
+                rebate_decimal = float(rebate_rate) / 100.0
+                discount_map[product_class] = rebate_decimal
+            except (ValueError, TypeError):
+                logger.warning(f"Could not convert rebate rate '{rebate_rate}' for '{product_class}'. Skipping row.")
+                continue
         
-        # Convert rebate to numeric, coercing errors to NaN, then drop them
-        df['RebateRate'] = pd.to_numeric(df['RebateRate'], errors='coerce')
-        df.dropna(subset=['RebateRate'], inplace=True)
+        if not discount_map:
+            logger.error(f"No valid discount entries found for {program_name}. Check if 'Product Class' and 'Rebate Rate (%)' columns have data.")
+            raise ValueError("No valid rows with 'Product Class' and 'Rebate Rate (%)' found in the provided data.")
 
-        # Create a dictionary from ProductClass to RebateRate
-        # If there are duplicates, keep the first one
-        discount_map = df.drop_duplicates(subset=['ProductClass']).set_index('ProductClass')['RebateRate'].to_dict()
-        
-        # Convert percentage to decimal (e.g., 5 -> 0.05)
-        for key, value in discount_map.items():
-            discount_map[key] = value / 100.0
-
-        # Save as JSON
         json_filename = f"{secure_filename(program_name)}.json"
         json_filepath = os.path.join(DISCOUNTS_DIR, json_filename)
         
         with open(json_filepath, 'w') as f:
             json.dump(discount_map, f, indent=2)
         
-        logger.info(f"Successfully created discount JSON: {json_filename}")
-        return True, None
+        logger.info(f"Successfully created discount JSON: {json_filename} with {len(discount_map)} entries.")
+        return program_name, None
 
     except Exception as e:
         logger.error(f"Error creating discount JSON for {program_name}: {e}")
-        return False, str(e)
+        return None, str(e)
 
-
-def save_discount_file(file, program_name=None):
-    """Saves an uploaded discount file and creates a JSON version of it."""
-    if not file or not file.filename:
-        return None, "No file provided"
-    
-    if program_name:
-        # Get the file extension from the original filename
-        _, extension = os.path.splitext(file.filename)
-        if not extension: extension = '.xlsx' # default extension
-        # Sanitize program_name to be a valid filename and add extension
-        filename = f"{secure_filename(program_name)}{extension}"
-    else:
-        filename = secure_filename(file.filename)
-    
-    # Use a temporary name to avoid confusion if JSON parsing fails
-    temp_filepath = os.path.join(DISCOUNTS_DIR, f"temp_{filename}")
-    file.save(temp_filepath)
-    logger.info(f"Saved temporary discount file: {temp_filepath}")
-
-    # Now, create the JSON version
-    effective_program_name = program_name or os.path.splitext(filename)[0]
-    success, error = _create_discount_json(temp_filepath, effective_program_name)
-    
-    if not success:
-        os.remove(temp_filepath) # Clean up temp file
-        logger.error(f"Failed to create JSON for {filename}. The Excel file was not saved.")
-        return None, f"Failed to process Excel file: {error}"
-
-    # If successful, rename temp file to final name
-    final_filepath = os.path.join(DISCOUNTS_DIR, filename)
-    os.rename(temp_filepath, final_filepath)
-    logger.info(f"Finalized saving discount file: {filename}")
-
-    return filename, None
-
-def delete_discount_file(filename):
-    """Deletes a discount file and its JSON counterpart."""
-    # Delete Excel file
-    excel_filepath = os.path.join(DISCOUNTS_DIR, secure_filename(filename))
-    if os.path.exists(excel_filepath):
-        os.remove(excel_filepath)
-        logger.info(f"Deleted discount file: {filename}")
-
-    # Delete JSON file
-    program_name, _ = os.path.splitext(filename)
+def delete_discount_file(program_name):
+    """Deletes a discount JSON file."""
     json_filename = f"{secure_filename(program_name)}.json"
     json_filepath = os.path.join(DISCOUNTS_DIR, json_filename)
+    
     if os.path.exists(json_filepath):
         os.remove(json_filepath)
         logger.info(f"Deleted discount JSON: {json_filename}")
+        return True, None
+    else:
+        logger.warning(f"Attempted to delete non-existent discount file: {json_filename}")
+        return False, "File not found"
 
-    return True, None
 
-
-def get_discount_data(filename):
-    """
-    Reads a processed discount JSON file and returns the discount map.
-    """
-    program_name, _ = os.path.splitext(filename)
+def get_discount_data(program_name):
+    """Reads a processed discount JSON file and returns the discount map."""
     json_filename = f"{secure_filename(program_name)}.json"
     filepath = os.path.join(DISCOUNTS_DIR, json_filename)
 
     if not os.path.exists(filepath):
-        return None, f"Discount program '{program_name}' has not been processed. Please re-upload."
+        return None, f"Discount program '{program_name}' not found."
         
     try:
         with open(filepath, 'r') as f:

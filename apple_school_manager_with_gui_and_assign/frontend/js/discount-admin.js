@@ -75,20 +75,25 @@ function DiscountAdminPage() {
     };
 
     const handleUpload = async () => {
-        if (!file || !programName) {
-            setError('Please select a valid file with a Program Name.');
+        if (!previewData || !programName) {
+            setError('Please select a valid file to generate a preview.');
             return;
         }
         setUploading(true);
         setError('');
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('program_name', programName);
+        
+        const payload = {
+            program_name: programName,
+            data: previewData
+        };
 
         try {
             const response = await fetch('/api/discounts/upload', {
                 method: 'POST',
-                body: formData,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
             });
             if (!response.ok) {
                 const errData = await response.json();
@@ -107,16 +112,16 @@ function DiscountAdminPage() {
         }
     };
 
-    const handleDelete = async (filename) => {
-        if (!confirm(`Are you sure you want to delete ${filename}?`)) return;
+    const handleDelete = async (programName) => {
+        if (!confirm(`Are you sure you want to delete ${programName}?`)) return;
 
         try {
-            const response = await fetch(`/api/discounts/${filename}`, {
+            const response = await fetch(`/api/discounts/${programName}`, {
                 method: 'DELETE',
             });
             if (!response.ok) throw new Error('Failed to delete file');
             // Refresh list
-            setDiscounts(discounts.filter(d => d !== filename));
+            setDiscounts(discounts.filter(d => d !== programName));
         } catch (err) {
             setError(err.message);
         }
@@ -182,10 +187,10 @@ function DiscountAdminPage() {
                         <p>Laddar...</p>
                     ) : discounts.length > 0 ? (
                         <ul className="item-list">
-                            {discounts.map(filename => (
-                                <li key={filename} className="item-list-item">
-                                    <span>{filename}</span>
-                                    <button onClick={() => handleDelete(filename)} className="btn btn-danger btn-sm">Ta bort</button>
+                            {discounts.map(program => (
+                                <li key={program} className="item-list-item">
+                                    <span>{program}</span>
+                                    <button onClick={() => handleDelete(program)} className="btn btn-danger btn-sm">Ta bort</button>
                                 </li>
                             ))}
                         </ul>

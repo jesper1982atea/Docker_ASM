@@ -373,36 +373,37 @@ class DiscountList(Resource):
 @discount_ns.route('/upload')
 class DiscountUpload(Resource):
     def post(self):
-        """Uploads a new discount program file."""
-        if 'file' not in request.files:
-            return {'error': 'No file part'}, 400
-        
-        file = request.files['file']
-        program_name = request.form.get('program_name')
+        """Processes a new discount program from JSON data provided by the frontend."""
+        payload = request.get_json()
+        if not payload:
+            return {'error': 'Invalid JSON payload'}, 400
 
-        if not program_name:
-            # Fallback for old method or if name is not provided
-            filename, error = discount_handler.save_discount_file(file)
-        else:
-            # New method: save with program name
-            filename, error = discount_handler.save_discount_file(file, program_name)
+        program_name = payload.get('program_name')
+        data = payload.get('data')
+
+        if not program_name or not data:
+            return {'error': 'Missing program_name or data in payload'}, 400
+
+        # The handler now processes the JSON data directly
+        filename, error = discount_handler.save_discount_from_data(program_name, data)
 
         if error:
             return {'error': error}, 400
+        
         return {'status': 'success', 'filename': filename}, 201
 
-@discount_ns.route('/<string:filename>')
+@discount_ns.route('/<string:program_name>')
 class DiscountFile(Resource):
-    def get(self, filename):
-        """Gets the parsed data from a specific discount file."""
-        data, error = discount_handler.get_discount_data(filename)
+    def get(self, program_name):
+        """Gets the parsed data from a specific discount program."""
+        data, error = discount_handler.get_discount_data(program_name)
         if error:
             return {'error': error}, 404
         return jsonify(data)
 
-    def delete(self, filename):
-        """Deletes a discount file."""
-        success, error = discount_handler.delete_discount_file(filename)
+    def delete(self, program_name):
+        """Deletes a discount program."""
+        success, error = discount_handler.delete_discount_file(program_name)
         if error:
             return {'error': error}, 404
         return {'status': 'deleted'}, 200
