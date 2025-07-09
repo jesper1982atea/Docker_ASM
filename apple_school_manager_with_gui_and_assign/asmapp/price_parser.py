@@ -64,7 +64,8 @@ def normalize_columns(df):
         'alp ex vat': 'ALP Ex VAT',
         'alp inc vat': 'ALP Inc VAT',
         'category': 'Category',
-        'npi': 'NPI'
+        'npi': 'NPI',
+        'marketing flag': 'Marketing Flag' # Add this mapping
     }
     for col in df.columns:
         normalized_col = str(col).lower().strip()
@@ -108,9 +109,34 @@ def parse_price_excel(file_stream):
             logger.error(f"File is missing required columns after finding header. Found: {list(df.columns)}")
             return None, "File is missing required columns: 'Part Number', 'Description', 'ALP Ex VAT'."
 
+        # --- New Category Extraction Logic ---
+        current_category = 'Uncategorized'
+        all_rows = []
+        for index, row in df.iterrows():
+            # Check if it's a category row: 'Marketing Flag' has a value, but 'Part Number' is NaN/empty.
+            is_category_row = pd.notna(row.get('Marketing Flag')) and pd.isna(row.get('Part Number'))
+            
+            if is_category_row:
+                current_category = row['Marketing Flag']
+                continue
+
+            # Check if it's a product row (must have a Part Number)
+            if pd.notna(row.get('Part Number')):
+                product_row = row.to_dict()
+                product_row['Category'] = current_category # Assign the current category
+                all_rows.append(product_row)
+        
+        # Create a new DataFrame from the processed rows
+        if not all_rows:
+            return [], None # Return empty list if no product rows found
+
+        df = pd.DataFrame(all_rows)
+        # --- End of New Category Extraction Logic ---
+
         # Drop rows where Part Number is missing or is not a valid part number
         df.dropna(subset=['Part Number'], inplace=True)
-        df = df[df['Part Number'].str.contains(r'^[A-Z0-9/]+$', na=False)]
+        # This regex filter might be too strict now, let's keep it but be aware.
+        df = df[df['Part Number'].astype(str).str.contains(r'^[A-Z0-9/]+$', na=False)]
         
         # Fill NaN with a placeholder for easier processing
         df.fillna('', inplace=True)
