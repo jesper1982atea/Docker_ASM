@@ -439,6 +439,20 @@ function SalesOrderDetailPage() {
                     )}
                 </div>
 
+                {/* --- Price Calculator for business models --- */}
+                {priceInfo && (
+                    <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
+                        <h3 style={{ margin: 0, marginBottom: '1.5rem' }}>Kalkylator för alternativa affärsmodeller</h3>
+                        <p style={{marginTop: '-1rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
+                            Använd kalkylatorn för att jämföra med den faktiska affären och se hur priset påverkas av restvärde och leasing.
+                        </p>
+                        <window.PriceCalculator 
+                            listPrice={priceInfo.cost} 
+                            discountRate={discountMap.get(priceInfo.category) || 0} 
+                        />
+                    </div>
+                )}
+
 
                 <div className="section">
                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem'}}>
