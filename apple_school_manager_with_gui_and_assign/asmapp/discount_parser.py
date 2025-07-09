@@ -33,6 +33,7 @@ def parse_discount_excel(file_stream):
         - data (list): A list of dicts with 'Product Class' and 'Rebate Rate'.
         - error (str): An error message if parsing fails, otherwise None.
     """
+    logger.critical("DEBUG: parse_discount_excel anropades. Detta bör INTE hända när man sparar från förhandsgranskningen, eftersom frontend ska skicka JSON direkt.")
     try:
         # Headers are in the 3rd row, so we skip the first 2 rows (header=2 in 0-indexed pandas)
         df = pd.read_excel(file_stream, header=2)

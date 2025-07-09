@@ -131,6 +131,8 @@ function DiscountAdminPage() {
             data: previewData
         };
 
+        console.log("DEBUG: Skickar följande payload till /api/discounts/upload:", JSON.stringify(payload, null, 2));
+
         try {
             const response = await fetch('/api/discounts/upload', {
                 method: 'POST',
@@ -140,8 +142,14 @@ function DiscountAdminPage() {
                 body: JSON.stringify(payload),
             });
             if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.error || 'Kunde inte spara programmet.');
+                let errorText = 'Kunde inte spara programmet.';
+                try {
+                    const errData = await response.json();
+                    errorText = errData.error || JSON.stringify(errData);
+                } catch (e) {
+                    errorText = await response.text();
+                }
+                throw new Error(errorText);
             }
             // Reset fields and refresh list
             setFile(null);
@@ -151,7 +159,8 @@ function DiscountAdminPage() {
             fetchDiscounts();
             alert('Rabattprogrammet har laddats upp!');
         } catch (err) {
-            setError(err.message);
+            console.error("FEL vid spara:", err);
+            setError(`Ett fel uppstod vid spara: ${err.message}`);
         } finally {
             setUploading(false);
         }
