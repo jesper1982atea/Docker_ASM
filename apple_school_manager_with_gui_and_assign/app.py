@@ -14,6 +14,8 @@ import logging
 import time
 import requests
 import threading
+import datetime
+from werkzeug.utils import secure_filename
 
 # Configure logging
 logging.basicConfig(
@@ -27,12 +29,17 @@ CORS(app)
 api = Api(app, title="Apple School Manager API", version="1.0", description="API för Apple School Manager-data", doc=False)
 
 CUSTOMERS_DIR = os.path.join(os.path.dirname(__file__), "admin_api", "customers")
+PRICE_UPLOADS_DIR = os.path.join(os.path.dirname(__file__), "price_uploads")
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 JS_DIR = os.path.join(FRONTEND_DIR, "js")
 
 # Cache for ASM instances to avoid recreating them
 _asm_instance_cache = {}
 _cache_lock = threading.Lock()
+
+def setup_price_uploads_dir():
+    if not os.path.exists(PRICE_UPLOADS_DIR):
+        os.makedirs(PRICE_UPLOADS_DIR)
 
 def get_asm_instance(customer_id):
     """Get ASM instance with caching to avoid multiple token requests"""
@@ -342,7 +349,7 @@ price_ns = Namespace('price', description='Apple Price List Data Endpoints')
 @price_ns.route('/upload')
 class PriceUpload(Resource):
     def post(self):
-        """Parses an uploaded Apple price list Excel file."""
+        """Parses an uploaded Apple price list Excel file and saves it."""
         if 'file' not in request.files:
             return {'error': 'No file part in the request'}, 400
         
@@ -351,10 +358,31 @@ class PriceUpload(Resource):
             return {'error': 'No file selected for uploading'}, 400
 
         if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
-            data, error = parse_price_excel(file.stream)
-            if error:
-                return {'error': f'Failed to parse file: {error}'}, 500
-            return jsonify(data)
+            try:
+                # Save the file with a timestamp
+                today = datetime.date.today().strftime("%Y-%m-%d")
+                original_filename = secure_filename(file.filename)
+                filename_base, file_extension = os.path.splitext(original_filename)
+                new_filename = f"{filename_base}_{today}{file_extension}"
+                save_path = os.path.join(PRICE_UPLOADS_DIR, new_filename)
+                
+                # Since file.stream can be read only once, we save the file first
+                # and then parse the saved file.
+                file.save(save_path)
+                logger.info(f"Saved uploaded price file to {save_path}")
+
+                # Now parse the saved file for the frontend preview
+                with open(save_path, 'rb') as saved_file:
+                    data, error = parse_price_excel(saved_file)
+                
+                if error:
+                    logger.error(f"Failed to parse saved file {save_path}: {error}")
+                    return {'error': f'Failed to parse file: {error}'}, 500
+                
+                return jsonify(data)
+            except Exception as e:
+                logger.error(f"Error during price file upload and processing: {e}")
+                return {'error': 'An internal error occurred while processing the file.'}, 500
         else:
             return {'error': 'Invalid file type, please upload an Excel file (.xlsx or .xls)'}, 400
 
@@ -728,6 +756,9 @@ if __name__ == "__main__":
     
     # Ensure the discounts directory exists
     discount_handler.setup_discounts_dir()
+    
+    # Ensure the price uploads directory exists
+    setup_price_uploads_dir()
     
     # Run on port 6000 to match the expected port from curl
     app.run(host="0.0.0.0", port=6000, debug=True)
