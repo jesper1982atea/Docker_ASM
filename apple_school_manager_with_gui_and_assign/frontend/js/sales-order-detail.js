@@ -95,15 +95,65 @@ function SalesOrderDetailPage() {
             </header>
 
             <main style={{ marginTop: '2rem' }}>
-                <div className="section">
-                    <h3>Säljinformation</h3>
-                    <div className="detail-grid">
-                        {Object.entries(orderData).map(([key, value]) => (
-                            <div className="detail-item" key={key}>
-                                <div className="detail-label">{key}</div>
-                                <div className="detail-value">{value}</div>
+                <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)' }}>
+                    <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>Säljinformation</h3>
+                    
+                    {/* Customer & Order Info */}
+                    <div className="detail-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'flex-start' }}>
+                        <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span className="detail-label">Kund</span>
+                            <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600' }}>{orderData['Kund']}</span>
+                        </div>
+                        <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span className="detail-label">Ordernummer</span>
+                            <span className="detail-value">{orderData['Ordernr']}</span>
+                        </div>
+                        <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span className="detail-label">Bokföringsdatum</span>
+                            <span className="detail-value">{orderData['Bokf datum']}</span>
+                        </div>
+                        <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                            <span className="detail-label">Verifikationsnummer</span>
+                            <span className="detail-value">{orderData['Ver nr']}</span>
+                        </div>
+                    </div>
+
+                    {/* Product Info */}
+                    <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
+                        <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Produktspecifikation</h4>
+                        <div className="detail-grid" style={{ gridTemplateColumns: '1fr', gap: '1rem' }}>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Artikelbenämning</span>
+                                <span className="detail-value">{orderData['Artikelbenämning (APA)']}</span>
                             </div>
-                        ))}
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Serienummer</span>
+                                <span className="detail-value" style={{ fontWeight: '600' }}>{orderData['Serienr']}</span>
+                            </div>
+                             <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Tillverkarens artikelnr.</span>
+                                <span className="detail-value">{orderData['Artikelnr (tillverkare)']}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Financial Info */}
+                    <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
+                        <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Ekonomi</h4>
+                        <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Antal</span>
+                                <span className="detail-value">{orderData['Antal']}</span>
+                            </div>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Försäljningspris (SEK)</span>
+                                <span className="detail-value">{orderData['Tot Förs (SEK)']}</span>
+                            </div>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Kostnadspris (SEK)</span>
+                                <span className="detail-value">{orderData['Tot Kost (SEK)']}</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
