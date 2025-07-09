@@ -4,6 +4,7 @@ function PriceDetailPage() {
     const [productData, setProductData] = useState(null);
     const [error, setError] = useState('');
     const [customerPrice, setCustomerPrice] = useState('');
+    const [marginPercent, setMarginPercent] = useState('');
 
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
@@ -34,18 +35,40 @@ function PriceDetailPage() {
     };
 
     const basePrice = parseFloat(String(productData['ALP Ex VAT']).replace(',', '.')) || 0;
-    const customerPriceNum = parseFloat(String(customerPrice).replace(',', '.')) || 0;
 
-    let profitSEK = 0;
-    let profitMargin = 0;
+    const handleCustomerPriceChange = (e) => {
+        const newPriceStr = e.target.value;
+        setCustomerPrice(newPriceStr);
 
-    if (customerPriceNum > 0 && basePrice > 0 && customerPriceNum >= basePrice) {
-        profitSEK = customerPriceNum - basePrice;
-        if (customerPriceNum !== 0) {
-            profitMargin = (profitSEK / customerPriceNum) * 100;
+        const newPriceNum = parseFloat(String(newPriceStr).replace(',', '.')) || 0;
+        if (newPriceNum > 0 && basePrice > 0 && newPriceNum >= basePrice) {
+            const profit = newPriceNum - basePrice;
+            const newMargin = (profit / newPriceNum) * 100;
+            setMarginPercent(newMargin.toFixed(2));
+        } else {
+            setMarginPercent('');
         }
-    }
-    
+    };
+
+    const handleMarginChange = (e) => {
+        const newMarginStr = e.target.value;
+        setMarginPercent(newMarginStr);
+
+        const newMarginNum = parseFloat(newMarginStr) || 0;
+        if (newMarginNum > 0 && newMarginNum < 100 && basePrice > 0) {
+            const newPrice = basePrice / (1 - (newMarginNum / 100));
+            setCustomerPrice(newPrice.toFixed(2));
+        } else if (newMarginNum === 0) {
+            setCustomerPrice(basePrice.toFixed(2));
+        } else {
+            setCustomerPrice('');
+        }
+    };
+
+    const customerPriceNum = parseFloat(String(customerPrice).replace(',', '.')) || 0;
+    const profitSEK = (customerPriceNum > 0 && basePrice > 0 && customerPriceNum >= basePrice) ? customerPriceNum - basePrice : 0;
+    const displayMargin = (customerPriceNum > 0 && basePrice > 0 && customerPriceNum >= basePrice) ? (profitSEK / customerPriceNum) * 100 : 0;
+
     const renderValue = (value) => {
         if (typeof value === 'boolean') {
             return value ? 'Ja' : 'Nej';
@@ -142,16 +165,41 @@ function PriceDetailPage() {
                                 <label>Inköpspris (ALP Ex. moms)</label>
                                 <div className="price-value">{formatNumber(basePrice)} kr</div>
                             </div>
+                            
                             <div className="price-item">
                                 <label htmlFor="customer-price">Ange kundpris (Ex. moms)</label>
                                 <input
                                     type="number"
                                     id="customer-price"
                                     value={customerPrice}
-                                    onChange={(e) => setCustomerPrice(e.target.value)}
+                                    onChange={handleCustomerPriceChange}
                                     placeholder="0.00"
+                                    step="0.01"
                                 />
                             </div>
+
+                            <div className="price-item">
+                                <label htmlFor="margin-percent">Ange marginal (%)</label>
+                                <input
+                                    type="number"
+                                    id="margin-percent"
+                                    value={marginPercent}
+                                    onChange={handleMarginChange}
+                                    placeholder="0.00"
+                                    step="0.01"
+                                    max="99.99"
+                                />
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="50"
+                                    step="0.5"
+                                    value={marginPercent || 0}
+                                    onChange={handleMarginChange}
+                                    style={{marginTop: '0.5rem'}}
+                                />
+                            </div>
+
                             <div className="price-result">
                                 <div className="result-item">
                                     <label>Vinst (kr)</label>
@@ -161,8 +209,8 @@ function PriceDetailPage() {
                                 </div>
                                 <div className="result-item">
                                     <label>Marginal (%)</label>
-                                    <div className={`result-value ${profitMargin > 0 ? 'profit' : ''}`}>
-                                        {formatNumber(profitMargin)} %
+                                    <div className={`result-value ${displayMargin > 0 ? 'profit' : ''}`}>
+                                        {formatNumber(displayMargin)} %
                                     </div>
                                 </div>
                             </div>
