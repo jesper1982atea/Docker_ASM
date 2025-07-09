@@ -7,6 +7,7 @@ from asmapp.asmapi import AppleSchoolManagerAPI
 from gsxapp.applegsx import AppleGSXAPI
 from asmapp.sales_parser import parse_sales_excel # Import the new parser
 from asmapp.price_parser import parse_price_excel # Import the price parser
+from asmapp.discount_parser import parse_discount_excel # Import the discount parser
 import asmapp.discount_handler as discount_handler # Import the discount handler
 import copy
 import shutil
@@ -458,18 +459,44 @@ class FunctionalDiscounts(Resource):
 @discount_ns.route('/upload')
 class DiscountUpload(Resource):
     def post(self):
-        """Processes a new discount program from JSON data provided by the frontend."""
-        payload = request.get_json()
-        if not payload:
-            return {'error': 'Invalid JSON payload'}, 400
+        """
+        Processes a new discount program.
+        Can handle either a direct JSON payload or an uploaded Excel file.
+        """
+        content_type = request.content_type
+        
+        # Handle Excel file upload
+        if 'multipart/form-data' in content_type:
+            if 'file' not in request.files:
+                return {'error': 'No file part in the request'}, 400
+            
+            file = request.files['file']
+            if file.filename == '':
+                return {'error': 'No file selected for uploading'}, 400
 
-        program_name = payload.get('program_name')
-        data = payload.get('data')
+            if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
+                program_name, data, error = parse_discount_excel(file.stream)
+                if error:
+                    return {'error': f'Failed to parse Excel file: {error}'}, 500
+            else:
+                return {'error': 'Invalid file type, please upload an Excel file (.xlsx or .xls)'}, 400
+        
+        # Handle JSON payload
+        elif 'application/json' in content_type:
+            payload = request.get_json()
+            if not payload:
+                return {'error': 'Invalid JSON payload'}, 400
+
+            program_name = payload.get('program_name')
+            data = payload.get('data')
+        
+        else:
+            return {'error': f'Unsupported content type: {content_type}'}, 415
 
         if not program_name or not data:
             return {'error': 'Missing program_name or data in payload'}, 400
 
-        # The handler now processes the JSON data directly
+        # The handler saves the discount program from the parsed data
         filename, error = discount_handler.save_discount_from_data(program_name, data)
 
         if error:
