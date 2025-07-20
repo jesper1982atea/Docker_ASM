@@ -682,6 +682,7 @@ export function CustomerProductSummaryView({ data }) {
   const [appleDiscountProgram, setAppleDiscountProgram] = useState('');
   const [applePartNumber, setApplePartNumber] = useState('MC7W4KS/A');
   const [applePriceData, setApplePriceData] = useState(null);
+  const [applePriceProduct, setApplePriceProduct] = useState(null);
   const [appleLoading, setAppleLoading] = useState(false);
   const [appleError, setAppleError] = useState('');
   const [calculatedPrices, setCalculatedPrices] = useState(null);
@@ -736,6 +737,7 @@ export function CustomerProductSummaryView({ data }) {
                   <PriceComparisonTable
                     summary={summary}
                     calculated={calculatedPrices}
+                    appleproduct={applePriceList}
                   />
                 </ErrorBoundary>
               

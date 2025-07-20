@@ -23,7 +23,7 @@ from routes.discounts import discounts_ns
 from routes.price import price_ns
 from routes.gsx import gsx_ns
 from routes.asm import asm_ns
-from routes.sales import sales_api
+from routes.sales import sales_ns
 
 
 api.add_namespace(price_ns, path='/api/price')
@@ -33,8 +33,8 @@ api.add_namespace(gsx_ns, path='/api/gsx')
 api.add_namespace(gsx_ns, path='/gsx-api-key')
 api.add_namespace(asm_ns, path='/api/asm')
 
-# Registrera sales_api blueprint för att aktivera /api/sales/upload
-app.register_blueprint(sales_api)
+
+api.add_namespace(sales_ns, path='/api/sales')
 
 
 @app.route('/<path:path>')

@@ -34,29 +34,28 @@
     # environment:
     #   - CHOKIDAR_USEPOLLING=true
     # restart: unless-stopped
-services:
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:6000"
+# services:
+#   backend:
+#     build:
+#       context: .
+#       dockerfile: Dockerfile
+#     ports:
+#       - "8080:6000"
    # depends_on:
    #   - frontend
 
-  frontend:
-    build:
-      context: ./apple_school_manager_with_gui_and_assign/react-frontend
-      dockerfile: Dockerfile.frontend
-    container_name: react-frontend
-    ports:
-      - "5173:80"
-    depends_on:
-      - backend
+  # frontend:
+  #   build:
+  #     context: ./apple_school_manager_with_gui_and_assign/react-frontend
+  #     dockerfile: Dockerfile.frontend
+  #   container_name: react-frontend
+  #   ports:
+  #     - "5173:80"
+  #   depends_on:
+  #     - backend
 
 
-volumes:
-  gsxdata:
+
     # environment:
     #   - CHOKIDAR_USEPOLLING=true
     # restart: unless-stopped
@@ -64,3 +63,33 @@ volumes:
 # volumes:
 #   gsxdata:
 
+version: "3.9"
+
+services:
+  backend:
+    build:
+      context: ./apple_school_manager_with_gui_and_assign/backend
+    container_name: asm-backend
+    ports:
+      - "8080:6000"
+    working_dir: /app
+    volumes:
+      - ./apple_school_manager_with_gui_and_assign/backend:/app
+    command: ["python", "app.py"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./apple_school_manager_with_gui_and_assign/react-frontend
+    container_name: asm-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  gsxdata:

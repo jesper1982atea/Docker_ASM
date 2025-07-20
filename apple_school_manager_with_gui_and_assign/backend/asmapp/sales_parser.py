@@ -1,7 +1,10 @@
 import pandas as pd
 import logging
 
+
 logger = logging.getLogger(__name__)
+
+
 
 def parse_sales_excel(file_stream):
     """
