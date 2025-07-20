@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8">
+  <title>Kundens Produktsammanställning</title>
+  <link rel="stylesheet" href="/css/atea-style.css">
+  <style>
+    body { font-family: sans-serif; margin: 2em; background: #f8f8f8; }
+    .container { max-width: 1100px; margin: 2rem auto; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px #0001; padding: 2rem; }
+    .card.section { background: #fff; padding: 1.5rem 2rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .comparison-card { border-radius: 8px; padding: 1.5rem 2rem; min-width: 260px; flex: 1 1 260px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); }
+    .detail-grid-condensed { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .detail-item { margin-bottom: 0.5rem; }
+    .price-result-comparison { margin-top: 2rem; }
+  </style>
+</head>
+<body>
+<div id="root" class="container"></div>
+<script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+<script type="module">
+import { fetchPriceCalculation, calculateSimplePrice } from '/frontend/js/priceUtils.js';
+
+const { useState, useEffect, createElement } = React;
+
+function CustomerProductSummary() {
+  // Simulerad data, byt ut mot din sessionStorage-hämtning om du vill
+  const [partNumber, setPartNumber] = useState('MC6T4KS/A');
+  const inkopspris = 7885.98;
+
+  const [priceLists, setPriceLists] = useState([]);
+  const [selectedPriceList, setSelectedPriceList] = useState('');
+  const [discountPrograms, setDiscountPrograms] = useState([]);
+  const [selectedDiscount, setSelectedDiscount] = useState('');
+  const [priceResult, setPriceResult] = useState(null);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [priceError, setPriceError] = useState('');
+
+  const [kontantMargin, setKontantMargin] = useState(8);
+  const [leasingMargin, setLeasingMargin] = useState(8);
+  const [cirkularMargin, setCirkularMargin] = useState(8);
+  const [simpleResidual, setSimpleResidual] = useState(15);
+  const [simpleResult, setSimpleResult] = useState(null);
+  const [simpleLoading, setSimpleLoading] = useState(false);
+  const [simpleError, setSimpleError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/price/list')
+      .then(res => res.json())
+      .then(data => {
+        setPriceLists(data);
+        if (data.length > 0) setSelectedPriceList(data[0]);
+      });
+    fetch('/api/discounts/')
+      .then(res => res.json())
+      .then(setDiscountPrograms);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedPriceList || !partNumber) return;
+    setPriceLoading(true);
+    setPriceError('');
+    setPriceResult(null);
+    fetchPriceCalculation({ partNumber, priceList: selectedPriceList, discountProgram: selectedDiscount })
+      .then(setPriceResult)
+      .catch(err => setPriceError(err.message))
+      .finally(() => setPriceLoading(false));
+  }, [selectedPriceList, selectedDiscount, partNumber]);
+
+  const handleSimpleCalc = async () => {
+    setSimpleLoading(true);
+    setSimpleError('');
+    setSimpleResult(null);
+    try {
+      // Använd alltid de rabatterade priserna från priceResult (med valt rabattprogram)
+      // ALP = list_price (listpris efter rabattprogram), inkopspris = new_price (ditt pris efter rabattprogram)
+      const alp = parseFloat((priceResult?.list_price ?? inkopspris).toString().replace(',', '.')) || inkopspris;
+      const inkopsprisMedRabatt = parseFloat((priceResult?.new_price ?? inkopspris).toString().replace(',', '.')) || inkopspris;
+      const result = await calculateSimplePrice({
+        inkopspris: inkopsprisMedRabatt,
+        restvardeProcent: simpleResidual,
+        alp_price: alp,
+        kontantMargin,
+        leasingMargin,
+        circularMargin: cirkularMargin
+      });
+      setSimpleResult(result);
+    } catch (err) {
+      setSimpleError(err.message);
+    } finally {
+      setSimpleLoading(false);
+    }
+  };
+
+  const formatSEK = v => Number(v).toLocaleString('sv-SE', { style: 'currency', currency: 'SEK' });
+
+  return createElement('div', null,
+    createElement('header', { className: 'atea-header' },
+      createElement('div', { className: 'header-content' },
+        createElement('a', { href: '/frontend/' },
+          createElement('img', { src: '/frontend/images/logo.jpg', alt: 'Atea Logo', className: 'header-logo', style: { height: '50px' } })
+        ),
+        createElement('div', null,
+          createElement('h1', { style: { marginBottom: 0 } }, 'Produktprisjämförelse'),
+          createElement('p', { style: { marginTop: 0 } }, 'Jämför olika prisalternativ för vald produkt.')
+        )
+      ),
+      createElement('div', { className: 'header-links' },
+        createElement('a', { href: '/frontend/price-upload.html', className: 'header-link' }, '⬅️ Tillbaka till Prislistan')
+      )
+    ),
+    createElement('div', { style: { margin: '1.5rem 0' } },
+      createElement('label', { htmlFor: 'partnumber-input', style: { fontWeight: 600, marginRight: 8 } }, 'Artikelnr:'),
+      createElement('input', {
+        id: 'partnumber-input',
+        type: 'text',
+        value: partNumber,
+        onChange: e => setPartNumber(e.target.value),
+        style: { fontSize: '1rem', padding: '0.3em 0.7em', borderRadius: 4, border: '1px solid #ccc', marginRight: 12, minWidth: 120 }
+      })
+    ),
+    selectedPriceList && partNumber && createElement('div', { className: 'card section', style: { marginTop: '1.5rem', marginBottom: '1.5rem' } },
+      createElement('div', { style: { marginBottom: '1rem' } },
+        createElement('label', { htmlFor: 'discount-select', style: { fontWeight: 600, marginRight: 8 } }, 'Rabattprogram:'),
+        createElement('select', {
+          id: 'discount-select', value: selectedDiscount,
+          onChange: e => setSelectedDiscount(e.target.value)
+        },
+          createElement('option', { value: '' }, 'Inget rabattprogram'),
+          discountPrograms.map(prog => createElement('option', { key: prog, value: prog }, prog))
+        )
+      ),
+      priceLoading && createElement('div', { style: { color: '#888' } }, 'Laddar pris...'),
+      priceError && createElement('div', { className: 'alert alert-danger' }, priceError),
+      priceResult && createElement(
+        'div',
+        {
+          className: 'price-result-grid',
+          style: {
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '1.2rem 2.5rem',
+            alignItems: 'center',
+            background: '#f6f8fa',
+            borderRadius: '10px',
+            padding: '1.5rem 2rem',
+            marginBottom: '1.5rem',
+            boxShadow: '0 2px 8px #0001'
+          }
+        },
+        // Inköpspris och Listpris bredvid varandra
+        createElement('div', { style: { gridColumn: '1/2', fontSize: '1.35rem', fontWeight: 700, color: '#1a7f37', marginBottom: 0 } },
+          'Inköpspris: ',
+          createElement('span', { style: { fontWeight: 700 } }, formatSEK(priceResult.new_price))
+        ),
+        createElement('div', { style: { gridColumn: '2/3', fontSize: '1.15rem', fontWeight: 600, color: '#5f3dc4', marginBottom: 0 } },
+          'Listpris: ',
+          createElement('span', { style: { fontWeight: 700 } }, formatSEK(priceResult.list_price))
+        ),
+        // Artikelnummer och Produktgrupp
+        createElement('div', { style: { gridColumn: '1/2', color: '#444', marginTop: '0.2rem', fontSize: '1.05rem' } },
+          createElement('b', null, 'Artikelnummer:'), ' ', priceResult.part_number
+        ),
+        createElement('div', { style: { gridColumn: '2/3', color: '#444', marginTop: '0.2rem', fontSize: '1.05rem' } },
+          createElement('b', null, 'Produktgrupp:'), ' ', priceResult.product?.Category || '-'
+        ),
+        // Produktbeskrivning över hela bredden
+        createElement('div', { style: { gridColumn: '1/3', color: '#666', marginTop: '0.2rem', fontSize: '1.05rem' } },
+          createElement('b', null, 'Produktbeskrivning:'), ' ', priceResult.product?.Description || '-'
+        ),
+        // Rabattprogram och rabatter
+        createElement('div', { style: { gridColumn: '1/3', marginTop: '0.7rem', background: '#eef6f9', borderRadius: 6, padding: '1rem 1.2rem' } },
+          createElement('div', { style: { fontWeight: 600, marginBottom: 4, color: '#1a7f37' } }, 'Rabattprogram'),
+          createElement('div', null,
+            createElement('b', null, 'Valt rabattprogram:'), ' ',
+            selectedDiscount ? selectedDiscount : 'Inget'
+          ),
+          createElement('div', { style: { marginTop: 6 } }, 'Rabatter:',
+            createElement('ul', { style: { margin: 0, paddingLeft: '1.2em' } },
+              Array.isArray(priceResult.discounts) && priceResult.discounts.length > 0
+                ? priceResult.discounts.map((d, i) =>
+                    createElement('li', { key: i }, d.source + ': ' + ((parseFloat(d.value) || 0) * 100).toFixed(2) + '%'))
+                : createElement('li', null, 'Inga rabatter')
+            )
+          ),
+          createElement('div', null, 'Total rabatt: ',
+            createElement('b', null, ((priceResult.total_discount || 0) * 100).toFixed(2) + '%')
+          ),
+          createElement('div', null, 'Rabattbelopp: ',
+            createElement('b', null,
+              priceResult.discount_amount !== undefined && priceResult.discount_amount !== null
+                ? formatSEK(priceResult.discount_amount)
+                : '-'
+            )
+          ),
+          createElement('div', null, 'Rabattkälla: ',
+            createElement('b', null, priceResult.discount_source || '-')
+          )
+        )
+      ),
+      createElement('div', { className: 'price-calculator-module card section', style: { marginTop: '2rem' } },
+        createElement('h3', { style: { marginBottom: '1.5rem' } }, 'Enkel Prisberäkning'),
+        createElement('div', {
+          className: 'detail-grid-condensed'
+        },
+          createElement('div', { className: 'detail-item' },
+            createElement('label', { className: 'detail-label' }, 'Marginal kontant: ', createElement('b', null, kontantMargin + '%')),
+            createElement('input', { type: 'range', min: 0, max: 50, step: 1, value: kontantMargin, onChange: e => setKontantMargin(Number(e.target.value)) })
+          ),
+          createElement('div', { className: 'detail-item' },
+            createElement('label', { className: 'detail-label' }, 'Marginal leasing: ', createElement('b', null, leasingMargin + '%')),
+            createElement('input', { type: 'range', min: 0, max: 50, step: 1, value: leasingMargin, onChange: e => setLeasingMargin(Number(e.target.value)) })
+          ),
+          createElement('div', { className: 'detail-item' },
+            createElement('label', { className: 'detail-label' }, 'Marginal cirkulärt: ', createElement('b', null, cirkularMargin + '%')),
+            createElement('input', { type: 'range', min: 0, max: 50, step: 1, value: cirkularMargin, onChange: e => setCirkularMargin(Number(e.target.value)) })
+          ),
+          createElement('div', { className: 'detail-item' },
+            createElement('label', { className: 'detail-label' }, 'Restvärde: ', createElement('b', null, simpleResidual + '%')),
+            createElement('input', { type: 'range', min: 0, max: 50, step: 1, value: simpleResidual, onChange: e => setSimpleResidual(Number(e.target.value)) })
+          )
+        ),
+        createElement('button', {
+          className: 'btn btn-primary', style: { marginTop: '1rem', minWidth: 180 },
+          onClick: handleSimpleCalc, disabled: simpleLoading
+        }, simpleLoading ? 'Beräknar...' : 'Räkna ut pris'),
+        simpleError && createElement('div', { className: 'alert alert-danger', style: { marginTop: '1rem' } }, simpleError),
+        simpleResult && createElement('div', { className: 'price-result-comparison', style: { marginTop: '2rem' } },
+          createElement('div', {
+            style: { display: 'flex', flexWrap: 'wrap', gap: '2rem', justifyContent: 'center' }
+          },
+            // Köp kontant
+            createElement('div', { className: 'comparison-card', style: { background: '#f8fafc', border: '1px solid #d1e7dd' } },
+              createElement('h4', { style: { color: '#1a7f37', marginBottom: 12 } }, 'Köp kontant'),
+              createElement('div', null, createElement('b', null, 'Pris till kund:'), ' ', simpleResult.kontant?.forsaljningspris ? (simpleResult.kontant.forsaljningspris) : '-'),
+              createElement('div', null, createElement('b', null, 'Marginal:'), ' ', simpleResult.kontant?.marginal ? formatSEK(simpleResult.kontant.marginal) : '-', ' (', simpleResult.kontant?.marginal_procent?.toFixed(2), '%)')
+            ),
+            // Leasing
+            createElement('div', { className: 'comparison-card', style: { background: '#f8f5ff', border: '1px solid #d6c8f5' } },
+              createElement('h4', { style: { color: '#5f3dc4', marginBottom: 12 } }, 'Leasing'),
+              createElement('table', { style: { width: '100%', fontSize: '1rem', borderCollapse: 'collapse', marginBottom: 8 } },
+                createElement('thead', null,
+                  createElement('tr', null,
+                    createElement('th', { style: { textAlign: 'left' } }, 'Period'),
+                    createElement('th', { style: { textAlign: 'right' } }, 'Månadskostnad')
+                  )
+                ),
+                createElement('tbody', null,
+                  ["24", "36", "48"].map(months =>
+                    createElement('tr', { key: months },
+                      createElement('td', null, months + ' mån'),
+                      createElement(
+                        'td',
+                        { style: { textAlign: 'right' } },
+                        simpleResult.leasing[months]?.manadskostnad
+                          ? formatSEK(simpleResult.leasing[months].manadskostnad)
+                          : '-'
+                      )
+                    )
+                  )
+                )
+              ),
+              // Totalkostnad och marginal under tabellen
+              createElement('div', { style: { marginTop: 12 } },
+                createElement('b', null, 'Totalkostnad:'), ' ',
+                (() => {
+                  // Hämta första giltiga månadskostnad och period
+                  const monthsArr = ["24", "36", "48"];
+                  const first = monthsArr.find(m => simpleResult.leasing[m]?.manadskostnad);
+                  return first
+                    ? formatSEK(simpleResult.leasing[first].manadskostnad * Number(first))
+                    : '-';
+                })()
+              ),
+              createElement('div', { style: { marginTop: 6 } },
+                createElement('b', null, 'Marginal:'), ' ',
+                simpleResult.leasing["24"]?.marginal ? formatSEK(simpleResult.leasing["24"].marginal) : '-', ' (', simpleResult.leasing["24"]?.marginal_procent?.toFixed(2), '%)'
+              )
+            ),
+            // Cirkulärt
+            createElement('div', { className: 'comparison-card', style: { background: '#e6f0ec', border: '1px solid #b2d8c7' } },
+              createElement('h4', { style: { color: '#0b5340', marginBottom: 12 } }, 'Cirkulärt (2 fakturor)'),
+              createElement('div', null, createElement('b', null, 'Faktura 1:'), ' ', simpleResult.circular?.faktura_1 ? formatSEK(simpleResult.circular.faktura_1) : '-'),
+              createElement('div', null, createElement('b', null, 'Faktura 2:'), ' ', simpleResult.circular?.faktura_2 ? formatSEK(simpleResult.circular.faktura_2) : '-'),
+              createElement('div', { style: { marginTop: 12 } },
+                createElement('b', null, 'Marginal:'), ' ',
+                simpleResult.circular?.marginal ? formatSEK(simpleResult.circular.marginal) : '-', ' (', simpleResult.circular?.marginal_procent?.toFixed(2), '%)'
+              ),
+              createElement('div', { style: { marginTop: 12, fontSize: '0.95em', color: '#333' } },
+                createElement('i', null, simpleResult.circular?.info)
+              )
+            )
+          ),
+          createElement('div', { style: { marginTop: '2rem', textAlign: 'center', color: '#888', fontSize: '1.05em' } },
+            createElement('b', null, 'Jämför alternativen:'), ' Kontantköp ger direktkostnad, leasing fördelar kostnaden över tid, cirkulärt upplägg delar upp betalningen i två fakturor.'
+          )
+        )
+      )
+    )
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(React.createElement(CustomerProductSummary));
+</script>
+</body>
+</html>
+

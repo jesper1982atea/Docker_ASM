@@ -1,0 +1,24 @@
+/* .detail-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 0.3rem;
+} */
+
+.detail-marginal {
+    font-size: 1rem;
+}
+
+.detail-marginal.positive {
+    color: #1a7f37;
+}
+
+.detail-marginal.negative {
+    color: #c0392b;
+}

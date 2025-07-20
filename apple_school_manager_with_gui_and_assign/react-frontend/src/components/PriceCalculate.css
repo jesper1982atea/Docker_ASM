@@ -1,0 +1,14 @@
+.badge {
+  color: white;
+  border-radius: 5px;
+  padding: 0.2em 0.6em;
+  margin-top: 0.5em;
+  font-weight: 600;
+  font-size: 0.8em;
+  display: inline-block;
+}
+
+.result-item table th,
+.result-item table td {
+  padding: 0.3rem 0.4rem;
+}

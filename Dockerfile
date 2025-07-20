@@ -1,33 +1,42 @@
+# 1. Bygg React-frontend med Node.js
+FROM node:20 AS frontend-build
+
+WORKDIR /app/frontend
+
+COPY apple_school_manager_with_gui_and_assign/react-frontend/package*.json ./
+RUN npm install
+
+COPY apple_school_manager_with_gui_and_assign/react-frontend/ ./
+RUN npm run build
+
+# 2. Python/Flask-backend
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Installera systemkrav för cryptodome och eventuella beroenden
+# Install system dependencies
 RUN apt-get update && apt-get install -y gcc libffi-dev curl && rm -rf /var/lib/apt/lists/*
 
-# Kopiera requirements och installera Python-paket
+# Install Python dependencies
 COPY apple_school_manager_with_gui_and_assign/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Kopiera hela projektet
+# Kopiera backendkod
 COPY apple_school_manager_with_gui_and_assign/ .
 
-# Debug: Lista vad som finns i /app för att se strukturen
-RUN ls -la /app/
-RUN find /app -name "app.py" -type f
+# Kopiera byggd React-app till rätt plats
+COPY --from=frontend-build /app/frontend/dist react-frontend/dist
 
-# Skapa admin_api/customers katalog
+# Skapa mappar som behövs
 RUN mkdir -p admin_api/customers
 
-# Lägg till app-katalogen i PYTHONPATH
+# Sätt Python-path
 ENV PYTHONPATH="/app:${PYTHONPATH}"
 
-# Exponera porten som Flask kör på
 EXPOSE 6000
 
-# Lägg till hälsokontroll
+# Hälsokoll
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:6000/health || exit 1
 
-# Starta appen - app.py finns nu i /app eftersom vi kopierade innehållet från apple_school_manager_with_gui_and_assign/
 CMD ["python", "app.py"]

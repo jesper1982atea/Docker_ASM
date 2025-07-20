@@ -1,262 +1,326 @@
+
 const { useState, useEffect, useMemo } = React;
 
-function PriceAnalysisBlock({ priceInfo, discountMap, discountLoading }) {
-    const { cost, sales, actualCost, category } = priceInfo;
 
-    // The discount rate from the map is now the combined (functional + program) rate
-    const totalRebateRate = discountMap.get(category) || 0;
-    const discountedAlp = cost * (1 - totalRebateRate); // This is Atea's calculated cost
-    const diff = actualCost - discountedAlp;
-    const diffPercent = cost !== 0 ? (diff / cost) * 100 : 0;
-
-    const marginActual = sales - actualCost;
-    const marginPercentActual = sales !== 0 ? (marginActual / sales) * 100 : 0;
-
-    return (
-        <div>
-            <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                <div className="detail-item price-box">
-                    <span className="detail-label">Försäljningspris (Kund)</span>
-                    <span className="detail-value">{sales.toFixed(2)} SEK</span>
-                </div>
-                <div className="detail-item price-box">
-                    <span className="detail-label">Faktiskt inköpspris</span>
-                    <span className="detail-value">{actualCost.toFixed(2)} SEK</span>
-                </div>
-                <div className="detail-item price-box final-price">
-                    <span className="detail-label">Faktisk marginal</span>
-                    <span className="detail-value" style={{ color: marginActual < 0 ? 'var(--atea-red)' : 'var(--atea-green)' }}>
-                        {marginActual.toFixed(2)} SEK ({marginPercentActual.toFixed(2)}%)
-                    </span>
-                </div>
-            </div>
-            <div style={{borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1.5rem'}}>
-                <h4 style={{marginTop: 0}}>Rabattanalys vs. Prislista</h4>
-                {discountLoading ? (
-                    <div className="loading"><div className="spinner-small"></div><p>Laddar rabatt...</p></div>
-                ) : (
-                    <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', gap: '1rem' }}>
-                        <div className="detail-item price-box">
-                            <span className="detail-label">Listpris (ALP Ex VAT)</span>
-                            <span className="detail-value">{cost.toFixed(2)} SEK</span>
-                        </div>
-                        <div className="detail-item price-box">
-                            <span className="detail-label">Total rabatt ({(totalRebateRate * 100).toFixed(2)}%)</span>
-                            <span className="detail-value" style={{color: 'var(--atea-red)'}}>-{(cost * totalRebateRate).toFixed(2)} SEK</span>
-                        </div>
-                        <div className="detail-item price-box">
-                            <span className="detail-label">Beräknat inköpspris</span>
-                            <span className="detail-value">{discountedAlp.toFixed(2)} SEK</span>
-                        </div>
-                        <div className="detail-item price-box" style={{ background: Math.abs(diffPercent) > 1 ? 'var(--atea-light-yellow)' : 'var(--atea-light-green)'}}>
-                            <span className="detail-label">Diff vs. faktiskt inköp</span>
-                            <span className="detail-value" style={{ color: diff !== 0 ? 'var(--atea-orange)' : 'inherit' }}>
-                                {diff.toFixed(2)} SEK ({diffPercent.toFixed(2)}%)
-                            </span>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
 
 function SalesOrderDetailPage() {
+    // Kolla om debugläge är aktivt via URL-param (MÅSTE ligga överst bland hooks!)
+    const debugMode = useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('debug') === 'true';
+    }, []);
+
     const [orderData, setOrderData] = useState(null);
     const [gsxDetails, setGsxDetails] = useState(null);
-    const [customers, setCustomers] = useState([]);
-    const [selectedCustomer, setSelectedCustomer] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // New state for price lookup
+    // Ta bort/flytta den gamla "prisberäknings-UI state" och dess hooks om du använder priceUtil-logik.
+    // Om du vill behålla avancerad kalkylator, se till att du har:
+    // const [priceCalcInput, setPriceCalcInput] = useState(null);
+
+    // Om du inte använder priceCalcInput längre, ta bort/flytta denna useEffect:
+    // useEffect(() => {
+    //     if (!priceCalcInput) return;
+    //     const fetchCalc = async () => {
+    //         setPriceCalcLoading(true);
+    //         setPriceCalcResult(null);
+    //         try {
+    //             const res = await fetch('/api/price/calculate-advanced', {
+    //                 method: 'POST',
+    //                 headers: { 'Content-Type': 'application/json' },
+    //                 body: JSON.stringify(priceCalcInput)
+    //             });
+    //             if (!res.ok) throw new Error('Kalkylfel');
+    //             const data = await res.json();
+    //             setPriceCalcResult(data);
+    //         } catch (e) {
+    //             setPriceCalcResult(null);
+    //         } finally {
+    //             setPriceCalcLoading(false);
+    //         }
+    //     };
+    //     fetchCalc();
+    // }, [priceCalcInput]);
+
+    // Enkel kalkylator state
+    const [kontantMargin, setKontantMargin] = useState(8);
+    const [leasingMargin, setLeasingMargin] = useState(8);
+    const [cirkularMargin, setCirkularMargin] = useState(8);
+    const [simpleResidual, setSimpleResidual] = useState(15);
+    const [simpleResult, setSimpleResult] = useState(null);
+    const [simpleLoading, setSimpleLoading] = useState(false);
+    const [simpleError, setSimpleError] = useState('');
+
+    // GSX-nyckel state
+    const [gsxApiKey, setGsxApiKey] = useState('');
+    const [gsxKeyStatus, setGsxKeyStatus] = useState('');
+
+    // Lägg till state för prislistor och vald prislista om det saknas
     const [priceLists, setPriceLists] = useState([]);
     const [selectedPriceList, setSelectedPriceList] = useState('');
-    const [priceInfo, setPriceInfo] = useState(null);
-    const [priceLoading, setPriceLoading] = useState(false);
 
-    // New state for discount programs
+    // Lägg till state för rabattprogram och vald rabatt
     const [discounts, setDiscounts] = useState([]);
     const [selectedDiscount, setSelectedDiscount] = useState('');
-    const [discountMap, setDiscountMap] = useState(new Map());
-    const [discountLoading, setDiscountLoading] = useState(false);
 
-    const productDetailData = useMemo(() => {
-        if (!priceInfo || !orderData) return null;
-        return {
-            'Part Number': orderData['Artikelnr (tillverkare)'],
-            'Description': orderData['Artikelbenämning (APA)'],
-            'Category': priceInfo.category,
-            // Add other fields if they become available in orderData or priceInfo
-        };
-    }, [orderData, priceInfo]);
+    // Lägg till state för prisberäkning och prisinfo
+    const [priceCalcLoading, setPriceCalcLoading] = useState(false);
+    const [priceCalcResult, setPriceCalcResult] = useState(null);
+    const [priceCalcInput, setPriceCalcInput] = useState(null);
 
+    const [priceInfo, setPriceInfo] = useState(null);
+    const [priceLoading, setPriceLoading] = useState(false);
+    const [priceError, setPriceError] = useState('');
+    const [priceResult, setPriceResult] = useState(null);
+
+
+
+    // Hämta orderdata (sessionStorage eller URL)
     useEffect(() => {
-        // Parse order data from URL
-        const params = new URLSearchParams(window.location.search);
-        const dataParam = params.get('data');
-        if (dataParam) {
-            try {
-                const decodedData = JSON.parse(decodeURIComponent(dataParam));
-                setOrderData(decodedData);
-            } catch (e) {
-                setError('Failed to parse order data from URL.');
+        let order = null;
+        try {
+            const sessionOrder = sessionStorage.getItem('selectedOrder');
+            if (sessionOrder) {
+                order = JSON.parse(sessionOrder);
+                setOrderData(order);
             }
-        } else {
-            setError('No order data provided in URL.');
-        }
-
-        // Fetch customers with GSX keys
-        const fetchCustomers = async () => {
-            try {
-                const res = await fetch('/api/customers');
-                const allCustomers = await res.json();
-                const gsxCustomers = allCustomers.filter(c => c.gsx_api_key);
-                setCustomers(gsxCustomers);
-                if (gsxCustomers.length > 0) {
-                    setSelectedCustomer(gsxCustomers[0].id);
+        } catch (e) { }
+        if (!order) {
+            const params = new URLSearchParams(window.location.search);
+            const dataParam = params.get('data');
+            if (dataParam) {
+                try {
+                    const decodedData = JSON.parse(decodeURIComponent(dataParam));
+                    setOrderData(decodedData);
+                } catch (e) {
+                    setError('Failed to parse order data from URL.');
                 }
-            } catch (e) {
-                console.error("Failed to fetch customers", e);
+            } else {
+                setError('No order data provided.');
             }
-        };
-        
-        // Fetch available price lists
+        }
+    }, []);
+
+    // Lägg till debug-logg för orderData
+    useEffect(() => {
+        console.log('[DEBUG] orderData:', orderData);
+    }, [orderData]);
+
+    // Hämta prislistor, rabatter
+    useEffect(() => {
         const fetchPriceLists = async () => {
             try {
                 const res = await fetch('/api/price/list');
                 if (!res.ok) return;
                 const files = await res.json();
                 setPriceLists(files);
-                if (files.length > 0) {
-                    setSelectedPriceList(files[0]); // Default to the latest
-                }
-            } catch (e) {
-                console.error("Failed to fetch price lists", e);
-            }
+                if (files.length > 0) setSelectedPriceList(files[0]);
+            } catch { }
         };
-
-        // Fetch available discount programs
         const fetchDiscounts = async () => {
             try {
                 const res = await fetch('/api/discounts/');
                 if (!res.ok) return;
                 const files = await res.json();
                 setDiscounts(files);
-            } catch (e) {
-                console.error("Failed to fetch discounts", e);
-            }
+            } catch { }
         };
-
-        fetchCustomers();
         fetchPriceLists();
         fetchDiscounts();
     }, []);
 
+    // Hämta prislistor vid sidladdning om det saknas
     useEffect(() => {
-        if (orderData && selectedCustomer) {
-            fetchGsxDetails();
-        }
-    }, [orderData, selectedCustomer]);
+        fetch('/api/price/list')
+            .then(res => res.json())
+            .then(data => {
+                setPriceLists(data);
+                if (data.length > 0) setSelectedPriceList(data[0]);
+            });
+    }, []);
 
-    // Effect to find price when price list or order data changes
+    // // Sätt input till kalkylatorn när order/prislista/rabatt ändras
+    // useEffect(() => {
+    //     if (!orderData || !selectedPriceList) return;
+    //     // Hämta prisdata för artikelnr via API (ingen lokal matchning längre)
+    //     const fetchPriceData = async () => {
+    //         setPriceCalcLoading(true);
+    //         setPriceCalcInput(null);
+    //         setPriceCalcResult(null);
+    //         try {
+    //             const params = new URLSearchParams({
+    //                 price_list_file: selectedPriceList,
+    //                 part_number: orderData ? (orderData['Artikelnr (tillverkare)'] || '').trim() : '',
+    //             });
+    //             if (selectedDiscount) {
+    //                 params.append('discount_program_name', selectedDiscount);
+    //             }
+    //             const res = await fetch(`/api/price/calculate?${params.toString()}`);
+    //             const data = await res.json();
+    //             if (!res.ok) throw new Error(data.error || 'Kunde inte hämta pris.');
+    //             // Sätt input till kalkylatorn baserat på API-resultat
+    //             setPriceCalcInput({
+    //                 listPrice: data.list_price || 0,
+    //                 discountedPrice: data.final_price || 0,
+    //                 salesPrice: orderData['Tot Förs (SEK)'] ? parseFloat(orderData['Tot Förs (SEK)']) : 0,
+    //                 margin: orderData['Tot Förs (SEK)'] && orderData['Tot Kost (SEK)']
+    //                     ? parseFloat(orderData['Tot Förs (SEK)']) - parseFloat(orderData['Tot Kost (SEK)'])
+    //                     : 0,
+    //                 residualValue: 0,
+    //                 businessType: 'leasing',
+    //                 leasePeriod: 36,
+    //                 circularChoice: false
+    //             });
+    //             setPriceCalcResult(data);
+    //         } catch (e) {
+    //             setPriceCalcInput(null);
+    //             setPriceCalcResult(null);
+    //             setError(e.message || 'Fel vid hämtning av pris.');
+    //         } finally {
+    //             setPriceCalcLoading(false);
+    //         }
+    //     };
+    //     fetchPriceData();
+    // }, [orderData, selectedPriceList, selectedDiscount]);
+
+    // // Hämta prisinformation för artikelnummer och prislista (fallback om priceCalcResult saknas)
     useEffect(() => {
-        if (!selectedPriceList || !orderData) {
-            setPriceInfo(null);
-            return;
-        }
-
-        const findPrice = async () => {
+        if (!orderData || !selectedPriceList) return;
+        const fetchPriceInfo = async () => {
             setPriceLoading(true);
             setPriceInfo(null);
             try {
-                const res = await fetch(`/api/price/data/${selectedPriceList}`);
-                if (!res.ok) throw new Error('Failed to load price data');
-                const priceData = await res.json();
-                
-                const partNumber = orderData['Artikelnr (tillverkare)'];
-                const productPriceInfo = priceData.find(item => item['Part Number'] === partNumber);
-
-                if (productPriceInfo) {
-                    const costPrice = parseFloat(productPriceInfo['ALP Ex VAT']);
-                    const salesPrice = parseFloat(orderData['Tot Förs (SEK)']);
-                    const actualCost = parseFloat(orderData['Tot Kost (SEK)']);
-
-                    if (!isNaN(costPrice) && !isNaN(salesPrice) && !isNaN(actualCost)) {
-                        setPriceInfo({
-                            cost: costPrice,
-                            sales: salesPrice,
-                            actualCost: actualCost,
-                            category: productPriceInfo.Category,
-                        });
-                    } else {
-                        // If any value is not a number, we treat it as not found to avoid partial data issues.
-                        setPriceInfo(null); 
-                    }
-                } else {
-                    setPriceInfo(null); // Not found
+                const partNumber = orderData ? (orderData['Artikelnr (tillverkare)'] || '').trim() : '';
+                const params = new URLSearchParams({
+                    part_number: partNumber,
+                    price_list: selectedPriceList
+                });
+                if (selectedDiscount) {
+                    // Sätt rabattprogrammet först i queryn som 'program_name'
+                    params.delete('part_number');
+                    params.delete('price_list');
+                    params.append('program_name', selectedDiscount);
+                    params.append('part_number', partNumber);
+                    params.append('price_list', selectedPriceList);
                 }
+                const url = `/api/discounts/lookup?${params.toString()}`;
+                console.log('[DEBUG] Fetching price info:', url);
+                const res = await fetch(url, {
+                    method: 'GET',
+                    headers: { 'accept': 'application/json' }
+                });
+                if (!res.ok) {
+                    const text = await res.text();
+                    setError(`Failed to fetch price info (status ${res.status}): ${text}`);
+                    return;
+                }
+                const data = await res.json();
+                setPriceInfo(data);
+                console.log('[DEBUG] priceInfo API-resultat:', data);
             } catch (e) {
-                console.error("Error fetching or processing price data", e);
-                setPriceInfo({ error: 'Could not process price data.' });
+                setPriceInfo(null);
+                setError(e.message || 'Fel vid hämtning av grundpris.');
             } finally {
                 setPriceLoading(false);
             }
         };
+        fetchPriceInfo();
+    }, [orderData, selectedPriceList, selectedDiscount]);
 
-        findPrice();
-    }, [selectedPriceList, orderData]);
-
-    // Effect to load discount data
+    // Hämta GSX-nyckel vid sidladdning
     useEffect(() => {
-        if (!selectedDiscount) {
-            setDiscountMap(new Map());
-            return;
-        }
-        const loadDiscountData = async () => {
-            setDiscountLoading(true);
+        const fetchGsxKey = async () => {
             try {
-                const res = await fetch(`/api/discounts/${selectedDiscount}`);
-                if (!res.ok) throw new Error('Failed to load discount data');
-                const discountData = await res.json();
-                const newDiscountMap = new Map(discountData.map(item => [item['Product Class'], item['Rebate Rate']]));
-                setDiscountMap(newDiscountMap);
-            } catch (e) {
-                console.error("Error loading discount data", e);
-            } finally {
-                setDiscountLoading(false);
+                // Ändra endpoint till /api/gsx/gsx-api-key
+                const res = await fetch('/api/gsx/gsx-api-key');
+                if (res.ok) {
+                    const data = await res.json();
+                    const key = data.api_key || data.apiKey || data.APIKey || '';
+                    setGsxApiKey(key);
+                    setGsxKeyStatus(key ? 'GSX API-nyckel finns.' : 'GSX API-nyckel saknas.');
+                } else {
+                    setGsxApiKey('');
+                    setGsxKeyStatus('GSX API-nyckel kunde inte hämtas.');
+                }
+            } catch {
+                setGsxApiKey('');
+                setGsxKeyStatus('GSX API-nyckel kunde inte hämtas.');
             }
         };
-        loadDiscountData();
-    }, [selectedDiscount]);
+        fetchGsxKey();
+    }, []);
 
+    // Hjälpfunktion för att normalisera serienummer
+    function normalizeSerial(serial) {
+        if (typeof serial !== 'string') return serial;
+        // Om serienumret börjar med 'S' och är 11 tecken långt, ta bort 'S'
+        if (serial.length === 11 && serial[0].toUpperCase() === 'S') {
+            return serial.slice(1);
+        }
+        return serial;
+    }
+
+    // GSX-detaljer (ny metodik)
     const fetchGsxDetails = async () => {
         const serialNumber = orderData?.['Serienr'];
-        if (!serialNumber || !selectedCustomer) return;
-
+        if (!serialNumber || !gsxApiKey) return;
         setLoading(true);
         setError('');
         setGsxDetails(null);
+        let fetchSuccess = false;
+        let lastError = null;
 
-        try {
-            const res = await fetch(`/api/${selectedCustomer}/gsx/device-details/${serialNumber}`);
-            if (!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || `Failed to fetch GSX details: ${res.statusText}`);
+        // Testa först med normaliserat serienummer (utan S om 11 tecken och börjar med S)
+        const normalized = normalizeSerial(serialNumber);
+        if (normalized !== serialNumber) {
+            try {
+                const fetchOptions = { headers: { 'X-GSX-API-KEY': gsxApiKey } };
+                const res = await fetch(`/api/gsx/device-details/${normalized}`, fetchOptions);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.device) {
+                        setGsxDetails(data.device);
+                        fetchSuccess = true;
+                    }
+                } else {
+                    lastError = `[GSX] misslyckades (normalized serial): ${normalized}, status: ${res.status}`;
+                }
+            } catch (e) {
+                lastError = `[GSX] exception (normalized serial): ${normalized}, error: ${e}`;
             }
-            const data = await res.json();
-            if (data && data.device) {
-                setGsxDetails(data.device);
-            } else {
-                throw new Error("Device not found in GSX response.");
-            }
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
         }
+        // Testa alltid även med originalet om normaliserat misslyckades
+        if (!fetchSuccess) {
+            try {
+                const fetchOptions = { headers: { 'X-GSX-API-KEY': gsxApiKey } };
+                const res = await fetch(`/api/gsx/device-details/${serialNumber}`, fetchOptions);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.device) {
+                        setGsxDetails(data.device);
+                        fetchSuccess = true;
+                    }
+                } else {
+                    lastError = `[GSX] misslyckades (original serial): ${serialNumber}, status: ${res.status}`;
+                }
+            } catch (e) {
+                lastError = `[GSX] exception (original serial): ${serialNumber}, error: ${e}`;
+            }
+        }
+        if (!fetchSuccess) {
+            setError('Fel vid hämtning av GSX-data.');
+            if (lastError) console.error(lastError);
+        }
+        setLoading(false);
     };
 
+    // Hämta GSX-detaljer när orderData eller gsxApiKey ändras
+    useEffect(() => {
+        if (orderData && gsxApiKey) fetchGsxDetails();
+    }, [orderData, gsxApiKey]);
+
+    // Export till Excel (oförändrat)
     const handleExportExcel = () => {
         if (!orderData || !gsxDetails) {
             alert("Vänta tills all data har laddats innan du exporterar.");
@@ -333,20 +397,113 @@ function SalesOrderDetailPage() {
         XLSX.writeFile(workbook, `Enhetsrapport_${orderData['Serienr']}.xlsx`);
     };
 
-    if (!orderData) {
-        return <div className="container"><h1>{error || 'Loading...'}</h1></div>;
-    }
 
-    const serialNumber = orderData['Serienr'];
+    // Hämta prisinformation och beräkna pris med priceUtil-logik
+    useEffect(() => {
+        if (!selectedPriceList || !(orderData && orderData['Artikelnr (tillverkare)'])) return;
+        setPriceLoading(true);
+        setPriceError('');
+        setPriceResult(null);
+        const partNumber = orderData ? (orderData['Artikelnr (tillverkare)'] || '').trim() : '';
+        import('/frontend/js/priceUtils.js').then(({ fetchPriceCalculation }) => {
+            fetchPriceCalculation({
+                partNumber,
+                priceList: selectedPriceList,
+                discountProgram: selectedDiscount
+            })
+                .then(setPriceResult)
+                .catch(err => setPriceError(err.message))
+                .finally(() => setPriceLoading(false));
+        });
+    }, [selectedPriceList, selectedDiscount, orderData]);
+
+    // Enkel kalkylator (priceUtil-logik)
+    const handleSimpleCalc = async () => {
+        setSimpleLoading(true);
+        setSimpleError('');
+        setSimpleResult(null);
+        try {
+            const alp = parseFloat((priceResult?.list_price ?? orderData['Tot Kost (SEK)'] ?? 0).toString().replace(',', '.')) || orderData['Tot Kost (SEK)'] || 0;
+            const inkopspris = parseFloat((priceResult?.new_price ?? orderData['Tot Kost (SEK)'] ?? 0).toString().replace(',', '.')) || orderData['Tot Kost (SEK)'] || 0;
+            const { calculateSimplePrice } = await import('/frontend/js/priceUtils.js');
+            const result = await calculateSimplePrice({
+                inkopspris,
+                restvardeProcent: simpleResidual,
+                alp_price: alp,
+                kontantMargin,
+                leasingMargin,
+                circularMargin: cirkularMargin
+            });
+            setSimpleResult(result);
+        } catch (err) {
+            setSimpleError(err.message);
+        } finally {
+            setSimpleLoading(false);
+        }
+    };
+
+    // --- UI ---
+    const serialNumber = orderData ? orderData['Serienr'] : '';
+
+   
+
+    // Marginal- och jämförelseberäkning
+    const comparison = React.useMemo(() => {
+        if (!orderData || !priceInfo) return null;
+        // Försök använda inköpspris från orderData om priceInfo.new_price saknas
+        const salesPrice = parseFloat(orderData['Tot Förs (SEK)']) || 0;
+        const costPrice = parseFloat(orderData['Tot Kost (SEK)']) || 0;
+        // Använd priceInfo.new_price om finns, annars orderData['Tot Kost (SEK)']
+        const purchasePrice = priceInfo.new_price !== undefined && priceInfo.new_price !== null
+            ? parseFloat(priceInfo.new_price) || 0
+            : costPrice;
+
+        // const margin = salesPrice - purchasePrice;
+        // const marginPercent = salesPrice ? (margin / salesPrice) * 100 : 0;
+        const diffToCost = purchasePrice - costPrice;
+        const diffToSales = salesPrice - purchasePrice;
+
+        return {
+            salesPrice,
+            costPrice,
+            purchasePrice,
+            //   margin,
+            //   marginPercent,
+            diffToCost,
+            diffToSales
+        };
+    }, [orderData, priceInfo]);
 
     return (
         <div className="container">
+            {/* Visa error högst upp */}
+            {error && (
+                <div
+                    className="alert alert-danger"
+                    style={{
+                        marginTop: '2rem',
+                        marginBottom: '2rem',
+                        padding: '1rem 1.5rem',
+                        backgroundColor: '#f8d7da',
+                        color: '#721c24',
+                        border: '1px solid #f5c6cb',
+                        borderRadius: '0.5rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '1rem'
+                    }}
+                >
+                    <span style={{ fontSize: '1.5rem' }}>⚠️</span>
+                    <span>{error}</span>
+                </div>
+            )}
+
             <header className="atea-header">
                 <div className="header-content">
                     <a href="/frontend/"><img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
                     <div>
                         <h1>Orderdetails</h1>
-                        <p>Ordernummer: {orderData['Ordernr']}</p>
+                        <p>Ordernummer: {orderData ? orderData['Ordernr'] : ''}</p>
                     </div>
                 </div>
                 <div className="header-links">
@@ -354,151 +511,108 @@ function SalesOrderDetailPage() {
                     <button onClick={handleExportExcel} className="header-link" disabled={!gsxDetails}>Exportera till Excel</button>
                 </div>
             </header>
-
             <main style={{ marginTop: '2rem' }}>
                 <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)' }}>
                     <h3 style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '1.5rem' }}>Säljinformation</h3>
-                    
-                    {/* Customer & Order Info */}
                     <div className="detail-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1.5rem', alignItems: 'flex-start' }}>
                         <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                             <span className="detail-label">Kund</span>
-                            <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600' }}>{orderData['Kund']}</span>
+                            <span className="detail-value" style={{ fontSize: '1.1rem', fontWeight: '600' }}>{orderData ? orderData['Kund'] : ''}</span>
                         </div>
                         <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                             <span className="detail-label">Ordernummer</span>
-                            <span className="detail-value">{orderData['Ordernr']}</span>
+                            <span className="detail-value">{orderData ? orderData['Ordernr'] : ''}</span>
                         </div>
                         <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                             <span className="detail-label">Bokföringsdatum</span>
-                            <span className="detail-value">{orderData['Bokf datum']}</span>
+                            <span className="detail-value">{orderData ? orderData['Bokf datum'] : ''}</span>
                         </div>
                         <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                             <span className="detail-label">Verifikationsnummer</span>
-                            <span className="detail-value">{orderData['Ver nr']}</span>
+                            <span className="detail-value">{orderData ? orderData['Ver nr'] : ''}</span>
                         </div>
                     </div>
-
-                    {/* Product Info - Now using a component if priceInfo is available */}
                     <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
-                         {priceInfo && productDetailData ? (
-                            <window.ProductDetailView productData={productDetailData} />
-                         ) : (
-                            <div>
-                                <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Produktspecifikation</h4>
-                                <div className="detail-grid" style={{ gridTemplateColumns: '1fr', gap: '1rem' }}>
-                                    <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                        <span className="detail-label">Artikelbenämning</span>
-                                        <span className="detail-value">{orderData['Artikelbenämning (APA)']}</span>
-                                    </div>
-                                    <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                        <span className="detail-label">Serienummer</span>
-                                        <span className="detail-value" style={{ fontWeight: '600' }}>{orderData['Serienr']}</span>
-                                    </div>
-                                    <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                                        <span className="detail-label">Tillverkarens artikelnr.</span>
-                                        <span className="detail-value">{orderData['Artikelnr (tillverkare)']}</span>
-                                    </div>
-                                </div>
+                        <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Produktspecifikation</h4>
+                        <div className="detail-grid" style={{ gridTemplateColumns: '1fr', gap: '1rem' }}>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Artikelbenämning</span>
+                                <span className="detail-value">{orderData ? orderData['Artikelbenämning (APA)'] : ''}</span>
                             </div>
-                         )}
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Serienummer</span>
+                                <span className="detail-value" style={{ fontWeight: '600' }}>{orderData ? orderData['Serienr'] : ''}</span>
+                            </div>
+                            <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
+                                <span className="detail-label">Tillverkarens artikelnr.</span>
+                                <span className="detail-value">{orderData ? orderData['Artikelnr (tillverkare)'] : ''}</span>
+                            </div>
+                        </div>
                     </div>
-
-                    {/* Financial Info */}
                     <div style={{ borderTop: '1px solid var(--border-color)', marginTop: '1.5rem', paddingTop: '1.5rem' }}>
                         <h4 style={{ marginTop: 0, marginBottom: '1rem' }}>Ekonomi</h4>
                         <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
                             <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                                 <span className="detail-label">Antal</span>
-                                <span className="detail-value">{orderData['Antal']}</span>
+                                <span className="detail-value">{orderData ? orderData['Antal'] : ''}</span>
                             </div>
                             <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                                 <span className="detail-label">Försäljningspris (SEK)</span>
-                                <span className="detail-value">{orderData['Tot Förs (SEK)']}</span>
+                                <span className="detail-value">{orderData ? orderData['Tot Förs (SEK)'] : ''}</span>
                             </div>
                             <div className="detail-item" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                                 <span className="detail-label">Kostnadspris (SEK)</span>
-                                <span className="detail-value">{orderData['Tot Kost (SEK)']}</span>
+                                <span className="detail-value">{orderData ? orderData['Tot Kost (SEK)'] : ''}</span>
                             </div>
                         </div>
-                    </div>
-                </div>
 
-                {/* --- Price & Margin Information --- */}
-                <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-                        <h3 style={{ margin: 0 }}>Pris, Marginal & Rabattanalys</h3>
-                        <div style={{display: 'flex', gap: '1rem'}}>
-                            <div className="form-group" style={{margin: 0}}>
-                                <label htmlFor="price-list-select" style={{marginRight: '1rem'}}>Prislista:</label>
-                                <select id="price-list-select" value={selectedPriceList} onChange={e => setSelectedPriceList(e.target.value)} disabled={priceLists.length === 0}>
-                                    {priceLists.length > 0 ? (
-                                        priceLists.map(f => <option key={f} value={f}>{f}</option>)
-                                    ) : (
-                                        <option>Inga prislistor</option>
-                                    )}
-                                </select>
+                        {/* Marginalboxar under försäljningspris och kostnadspris */}
+                        {orderData && (
+                            <div className="detail-grid" style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
+
+                                {renderMarginFromOrderData(parseFloat(orderData['Tot Kost (SEK)']), parseFloat(orderData['Tot Förs (SEK)']))}
                             </div>
-                             <div className="form-group" style={{margin: 0}}>
-                                <label htmlFor="discount-select" style={{marginRight: '1rem'}}>Rabattprogram:</label>
-                                <select id="discount-select" value={selectedDiscount} onChange={e => setSelectedDiscount(e.target.value)} disabled={discounts.length === 0}>
-                                    <option value="">Inget</option>
-                                    {discounts.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                    {priceLoading ? (
-                        <div className="loading"><div className="spinner-small"></div><p>Hämtar pris...</p></div>
-                    ) : priceInfo ? (
-                        <PriceAnalysisBlock priceInfo={priceInfo} discountMap={discountMap} discountLoading={discountLoading} />
-                    ) : (
-                        <p>Inget pris hittades för artikelnummer <strong>{orderData['Artikelnr (tillverkare)']}</strong> i den valda prislistan.</p>
-                    )}
-                </div>
+                        )}
 
-                {/* --- Price Calculator for business models --- */}
-                {priceInfo && (
-                    <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
-                        <h3 style={{ margin: 0, marginBottom: '1.5rem' }}>Kalkylator för alternativa affärsmodeller</h3>
-                        <p style={{marginTop: '-1rem', marginBottom: '1.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
-                            Använd kalkylatorn för att jämföra med den faktiska affären och se hur priset påverkas av restvärde och leasing.
-                        </p>
-                        <window.PriceCalculator 
-                            listPrice={priceInfo.cost} 
-                            discountRate={discountMap.get(priceInfo.category) || 0} // Pass the combined rate
-                            originalDeal={{
-                                sales: priceInfo.sales,
-                                margin: priceInfo.sales - priceInfo.actualCost
-                                // marginPercent is now calculated inside the calculator based on its own logic
-                            }}
-                        />
-                    </div>
-                )}
+                        {/* rendera prisinformatio försäljningspris och kostnadspris */}
+                        {orderData && (
+                            <div
+                                className="detail-grid"
+                                style={{ gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}
+                            >
+                                {priceInfo && Object.keys(priceInfo).length > 0 && (
+                                    <div className="price-info-wrapper" style={{ gridColumn: '1 / -1' }}>
+                                        {/* Rabattprogram-dropdown */}
+                                        {/* <div
+                                            className="rendered-discount-dropdown"
+                                            dangerouslySetInnerHTML={{ __html: renderDiscountDropdown() }}
+                                        /> */}
 
-
-                <div className="section">
-                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem'}}>
-                        <h2 style={{color: 'var(--atea-black)', margin: 0, border: 'none'}}>GSX Information</h2>
-                        <div className="form-group" style={{margin: 0}}>
-                            <label htmlFor="customer-select" style={{marginRight: '1rem'}}>Välj kund för GSX-uppslag:</label>
-                            <select id="customer-select" value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} disabled={customers.length === 0}>
-                                {customers.length > 0 ? (
-                                    customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
-                                ) : (
-                                    <option>Inga kunder med GSX-nyckel hittades</option>
+                                        {/* Produktprisinfo */}
+                                        <div
+                                            className="rendered-product-info"
+                                            dangerouslySetInnerHTML={{ __html: renderProductPriceInfo(priceInfo) }}
+                                        />
+                                    </div>
                                 )}
-                            </select>
-                        </div>
+                            </div>
+                        )}
+
                     </div>
 
+                </div>
+                {/* --- GSX-information --- */}
+                <div className="section">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem', marginBottom: '2rem' }}>
+                        <h2 style={{ color: 'var(--atea-black)', margin: 0, border: 'none' }}>GSX Information</h2>
+                        <span style={{ fontSize: '0.95em', color: '#888' }}>{gsxKeyStatus}</span>
+                    </div>
                     {loading && <div className="loading"><div className="spinner"></div><p>Hämtar GSX-detaljer...</p></div>}
-                    {error && <div className="alert alert-danger">{error}</div>}
-                    
+                    {/* Ta bort error härifrån, visas nu högst upp */}
                     {gsxDetails ? (
                         <window.GsxDetailsView gsxDetails={gsxDetails} serial={serialNumber} />
                     ) : (
-                        !loading && !error && <p>Välj en kund för att se GSX-information.</p>
+                        !loading && !error && <p>GSX-information saknas för denna enhet.</p>
                     )}
                 </div>
             </main>
@@ -508,3 +622,4 @@ function SalesOrderDetailPage() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<SalesOrderDetailPage />);
+

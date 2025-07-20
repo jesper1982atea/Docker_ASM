@@ -1,4 +1,43 @@
+const handleBulkExport = async () => {
+        if (!augmentedData || augmentedData.length === 0) {
+            alert("Ingen data att exportera.");
+            return;
+        }
+        if (!gsxEnabled) {
+            alert("GSX är inte aktiverat eller API-nyckel saknas.");
+            return;
+        }
+        setIsExporting(true);
+        setExportProgress(0);
+        const exportData = [];
+        const totalRows = augmentedData.length;
+        for (let i = 0; i < totalRows; i++) {
+            const row = augmentedData[i];
+            exportData.push({ ...row });
+            setExportProgress(((i + 1) / totalRows) * 100);
+        }
+        const worksheet = XLSX.utils.json_to_sheet(exportData);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Säljdata med GSX");
+        const colWidths = Object.keys(exportData[0] || {}).map(key => ({ wch: Math.max(key.length, 18) }));
+        worksheet["!cols"] = colWidths;
+        XLSX.writeFile(workbook, "Säljdata_Export.xlsx");
+        setIsExporting(false);
+    };
+console.log('[sales-upload] sales-upload.js loaded!');
+
+if (typeof window.useGsxApiKey !== 'function') {
+    const root = document.getElementById('root');
+    if (root) {
+        root.innerHTML = '<div style="color:red;padding:2em">Fel: window.useGsxApiKey är inte laddad!<br>Kontrollera att gsx-api-key.js laddas innan sales-upload.js.</div>';
+    }
+    console.error('[sales-upload] Fel: window.useGsxApiKey är inte laddad!');
+    // Stoppa vidare körning
+    throw new Error('window.useGsxApiKey är inte laddad!');
+}
+
 const { useState, useEffect, useMemo } = React;
+const useGsxApiKey = window.useGsxApiKey;
 
 function Pagination({ currentPage, totalPages, onPageChange }) {
     if (totalPages <= 1) {
@@ -80,8 +119,7 @@ function SalesUploader() {
     const [error, setError] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
-    const [customers, setCustomers] = useState([]);
-    const [selectedCustomer, setSelectedCustomer] = useState('');
+    // (customers och selectedCustomer behövs ej)
     const [isExporting, setIsExporting] = useState(false);
     const [exportProgress, setExportProgress] = useState(0);
 
@@ -90,21 +128,59 @@ function SalesUploader() {
     const [selectedPriceList, setSelectedPriceList] = useState('');
     const [priceMap, setPriceMap] = useState(new Map());
 
+
+    // GSX API-nyckel state och hantering (samma logik som gsx-search.js)
+    const { gsxApiKey, loading: gsxLoading, error: gsxError } = useGsxApiKey({ redirectIfMissing: false });
+    const [gsxApiKeyInput, setGsxApiKeyInput] = useState('');
+    const [gsxApiKeySaved, setGsxApiKeySaved] = useState(false);
+    const [gsxSaveError, setGsxSaveError] = useState('');
+    const [gsxEnabled, setGsxEnabled] = useState(false);
+    const [gsxTested, setGsxTested] = useState(false);
+    const [gsxStatusMsg, setGsxStatusMsg] = useState('');
+
+    // Ladda in nuvarande nyckel till inputfältet när den hämtats
     useEffect(() => {
-        // Fetch customers with GSX keys
-        const fetchCustomers = async () => {
-            try {
-                const res = await fetch('/api/customers');
-                const allCustomers = await res.json();
-                const gsxCustomers = allCustomers.filter(c => c.gsx_api_key);
-                setCustomers(gsxCustomers);
-                if (gsxCustomers.length > 0) {
-                    setSelectedCustomer(gsxCustomers[0].id);
-                }
-            } catch (e) {
-                console.error("Failed to fetch customers", e);
+        if (gsxApiKey !== undefined && gsxApiKey !== null) {
+            setGsxApiKeyInput(gsxApiKey);
+        }
+    }, [gsxApiKey]);
+
+    // Spara GSX API-nyckel
+    const handleGsxApiKeySave = async (e) => {
+        e.preventDefault();
+        setGsxApiKeySaved(false);
+        setGsxSaveError('');
+        try {
+            const res = await fetch('/api/gsx/gsx-api-key', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ api_key: gsxApiKeyInput })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setGsxApiKeySaved(true);
+            } else {
+                setGsxSaveError(data.error || 'Fel vid sparande');
             }
-        };
+        } catch {
+            setGsxSaveError('Nätverksfel vid sparande');
+        }
+    };
+
+    // Logga varför exportknappen är inaktiv
+    useEffect(() => {
+        if (!data) {
+            console.log('[sales-upload] Exportknapp inaktiv: ingen data');
+        } else if (!gsxEnabled) {
+            console.log('[sales-upload] Exportknapp inaktiv: GSX ej aktiverat');
+        } else if (isExporting) {
+            console.log('[sales-upload] Exportknapp inaktiv: export pågår');
+        } else {
+            console.log('[sales-upload] Exportknapp AKTIV');
+        }
+    }, [data, gsxEnabled, isExporting]);
+
+    useEffect(() => {
         // Fetch available price lists
         const fetchPriceLists = async () => {
             try {
@@ -119,8 +195,49 @@ function SalesUploader() {
                 console.error("Failed to fetch price lists", e);
             }
         };
-        fetchCustomers();
+        // Hämta GSX API-nyckel och inställning från backend (fixad endpoint)
+        const fetchGsxConfig = async () => {
+            try {
+                const res = await fetch('/api/gsx/gsx-api-key');
+                if (res.ok) {
+                    let data = null;
+                    try {
+                        data = await res.json();
+                    } catch (jsonErr) {
+                        setGsxEnabled(false);
+                        setGsxStatusMsg('GSX API-nyckel kunde inte tolkas (ej JSON).');
+                        console.log('[sales-upload] GSX API-nyckel kunde inte tolkas (ej JSON):', jsonErr);
+                        return;
+                    }
+                    // Hämta nyckel oavsett stavning
+                    const key = data.api_key || data.apiKey || data.APIKey || '';
+                    console.log('[sales-upload] /api/gsx/gsx-api-key response:', data, 'Tolkat key:', key);
+                    if (key) {
+                        setGsxEnabled(true);
+                        setGsxStatusMsg('GSX API-nyckel finns. Export är aktiverad.');
+                        setGsxApiKeyInput(key);
+                        console.log('[sales-upload] GSX aktiverad, apiKey:', key);
+                    } else {
+                        setGsxEnabled(false);
+                        setGsxStatusMsg('GSX API-nyckel saknas.');
+                        console.log('[sales-upload] GSX INTE aktiverad, apiKey saknas');
+                    }
+                } else {
+                    setGsxEnabled(false);
+                    setGsxStatusMsg('GSX API-nyckel kunde inte hämtas.');
+                    console.log('[sales-upload] GSX API-nyckel kunde inte hämtas (HTTP error)');
+                }
+            } catch (err) {
+                setGsxEnabled(false);
+                setGsxStatusMsg('GSX API-nyckel kunde inte hämtas.');
+                console.log('[sales-upload] GSX API-nyckel kunde inte hämtas (exception):', err);
+            } finally {
+                setGsxTested(true);
+            }
+        };
+
         fetchPriceLists();
+        fetchGsxConfig();
     }, []);
 
     // Effect to load the selected price list data and create a lookup map
@@ -196,7 +313,6 @@ function SalesUploader() {
     const augmentedData = useMemo(() => {
         if (!data) return null;
         if (priceMap.size === 0) return data;
-
         return data.map(row => {
             const partNumber = row['Artikelnr (tillverkare)'];
             const alpPrice = priceMap.get(partNumber);
@@ -217,70 +333,16 @@ function SalesUploader() {
         return finalHeaders;
     }, [augmentedData, priceMap]);
 
-    const handleBulkExport = async () => {
-        if (!augmentedData || augmentedData.length === 0) {
-            alert("Ingen data att exportera.");
-            return;
+    // Hjälpfunktion för att normalisera serienummer
+    function normalizeSerial(serial) {
+        if (typeof serial !== 'string') return serial;
+        // Om serienumret börjar med S och är längre än 12 tecken, ta bort S
+        if (serial.length > 12 && serial[0].toUpperCase() === 'S') {
+            return serial.slice(1);
         }
-        if (!selectedCustomer) {
-            alert("Välj en kund för GSX-uppslag.");
-            return;
-        }
-    
-        setIsExporting(true);
-        setExportProgress(0);
-    
-        const exportData = [];
-        const totalRows = augmentedData.length;
-    
-        for (let i = 0; i < totalRows; i++) {
-            const row = augmentedData[i];
-            const serialNumber = row['Serienr'];
-            let gsxData = {};
-    
-            if (serialNumber) {
-                try {
-                    const res = await fetch(`/api/${selectedCustomer}/gsx/device-details/${serialNumber}`);
-                    if (res.ok) {
-                        const result = await res.json();
-                        if (result && result.device) {
-                            // Flatten GSX data for Excel
-                            gsxData = {
-                                'GSX Produktbeskrivning': result.device.productDescription,
-                                'GSX Konfiguration': result.device.configDescription,
-                                'GSX Garantistatus': result.device.warrantyInfo?.warrantyStatusDescription,
-                                'GSX Inköpsdatum': result.device.warrantyInfo?.purchaseDate ? new Date(result.device.warrantyInfo.purchaseDate).toLocaleDateString() : 'N/A',
-                                'GSX Dagar kvar på garanti': result.device.warrantyInfo?.daysRemaining,
-                                'GSX Upplåst': result.device.activationDetails?.unlocked ? 'Ja' : 'Nej',
-                            };
-                        }
-                    }
-                } catch (e) {
-                    console.error(`Failed to fetch GSX for ${serialNumber}:`, e);
-                    gsxData = { 'GSX Produktbeskrivning': 'Fel vid hämtning' };
-                }
-            }
-            
-            // Add a small delay to not hammer the API
-            await new Promise(resolve => setTimeout(resolve, 200));
-    
-            exportData.push({ ...row, ...gsxData });
-            setExportProgress(((i + 1) / totalRows) * 100);
-        }
-    
-        // Create and download Excel file
-        const worksheet = XLSX.utils.json_to_sheet(exportData);
-        const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Säljdata med GSX");
-    
-        // Auto-fit columns by setting a sensible default width
-        const colWidths = Object.keys(exportData[0] || {}).map(key => ({ wch: Math.max(key.length, 18) }));
-        worksheet["!cols"] = colWidths;
-    
-        XLSX.writeFile(workbook, "Säljdata_Export.xlsx");
-    
-        setIsExporting(false);
-    };
+        return serial;
+    }
+
 
     const handleRowClick = (row) => {
         const rowData = encodeURIComponent(JSON.stringify(row));
@@ -295,7 +357,7 @@ function SalesUploader() {
             <header className="atea-header">
                 <div className="header-content">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
-                        <a href="/frontend/"><img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
+                        <a href="/"><img src="/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
                         <div>
                             <h1>Atea Sales Data</h1>
                             <p>Ladda upp och granska Excel-fil med säljinformation</p>
@@ -319,28 +381,46 @@ function SalesUploader() {
                         <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem'}}>
                             <div>
                                 <h4>Exportera med GSX-data</h4>
-                                <p>Välj en kund nedan för att berika exporten med GSX-information.</p>
-                                <div className="form-group">
-                                    <label>Välj kund för GSX-uppslag</label>
-                                    <select value={selectedCustomer} onChange={e => setSelectedCustomer(e.target.value)} disabled={customers.length === 0 || isExporting}>
-                                        {customers.length > 0 ? (
-                                            customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)
-                                        ) : (
-                                            <option>Inga kunder med GSX-nyckel</option>
-                                        )}
-                                    </select>
+                                <p style={{color: gsxEnabled ? 'var(--atea-green)' : 'var(--atea-red)'}}>
+                                    {gsxTested ? gsxStatusMsg : 'Kontrollerar GSX-konfiguration...'}
+                                </p>
+                                <div style={{display:'flex', gap:'1em', flexWrap:'wrap', alignItems:'center'}}>
+                                    <button
+                                        onClick={handleBulkExport}
+                                        disabled={!augmentedData || !gsxEnabled || isExporting}
+                                        className="btn btn-success"
+                                    >
+                                        {isExporting ? `Exporterar... (${Math.round(exportProgress)}%)` : 'Exportera allt till Excel'}
+                                    </button>
+                                    <button className="btn btn-info" style={{minWidth:'220px'}} onClick={() => {
+                                        try {
+                                            if (!augmentedData || !Array.isArray(augmentedData) || augmentedData.length === 0) {
+                                                alert('Ingen data att visa. Ladda upp och granska en fil först.');
+                                                return;
+                                            }
+                                            const json = JSON.stringify(augmentedData);
+                                            // Kontrollera storlek (ca 5MB gräns för sessionStorage)
+                                            if (json.length > 4_500_000) {
+                                                alert('Data är för stor för att visas i sammanställningen. Prova med en mindre fil.');
+                                                return;
+                                            }
+                                            sessionStorage.setItem('customerProductSummaryData', json);
+                                            window.location.href = '/customer-product-summary';
+                                        } catch (e) {
+                                            alert('Kunde inte spara data i sessionStorage. Prova en mindre fil.');
+                                            return;
+                                        }
+                                    }}>
+                                        Visa produktsammanställning
+                                    </button>
                                 </div>
-                                <br></br>
-                                <button onClick={handleBulkExport} disabled={!data || !selectedCustomer || isExporting} className="btn btn-success">
-                                    {isExporting ? `Exporterar... (${Math.round(exportProgress)}%)` : 'Exportera allt till Excel'}
-                                </button>
                                 {isExporting && (
                                     <div className="progress-bar" style={{marginTop: '1rem'}}>
                                         <div className="progress-bar-inner" style={{width: `${exportProgress}%`}}></div>
                                     </div>
                                 )}
                             </div>
-                             <div>
+                            <div>
                                 <h4>Prisuppslag</h4>
                                 <p>Välj en prislista för att se kostnadspris (ALP Ex VAT) för varje artikel.</p>
                                 <div className="form-group">
@@ -384,7 +464,7 @@ function SalesUploader() {
                                 ))}
                             </tbody>
                         </table>
-                         <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem'}}>
+                        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '1rem'}}>
                             <Pagination 
                                 currentPage={currentPage}
                                 totalPages={totalPages}
@@ -398,5 +478,37 @@ function SalesUploader() {
     );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<SalesUploader />);
+// Se till att window.useGsxApiKey är laddad innan SalesUploader används
+function waitForGsxApiKeyHook(cb) {
+    if (typeof window.useGsxApiKey === 'function') {
+        cb(window.useGsxApiKey);
+    } else {
+        setTimeout(() => waitForGsxApiKeyHook(cb), 50);
+    }
+}
+
+waitForGsxApiKeyHook(function(useGsxApiKey) {
+    try {
+        console.log('[sales-upload] waitForGsxApiKeyHook triggered');
+        const container = document.getElementById('root');
+        if (!container) {
+            console.error('[sales-upload] #root element not found');
+            return;
+        }
+        if (!container._reactRootContainer) {
+            container._reactRootContainer = ReactDOM.createRoot(container);
+            console.log('[sales-upload] React root created');
+        } else {
+            console.log('[sales-upload] React root already exists');
+        }
+        // Rendera riktiga appen direkt
+        container._reactRootContainer.render(<SalesUploader />);
+        console.log('[sales-upload] SalesUploader rendered');
+    } catch (err) {
+        console.error('[sales-upload] Fatal error during root render:', err);
+        if (container) {
+            container.innerHTML = '<div style="color:red;padding:2em">Fel vid root-rendering: ' + (err && err.message ? err.message : err) + '</div>';
+        }
+    }
+});
+

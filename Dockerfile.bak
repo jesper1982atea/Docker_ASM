@@ -1,0 +1,33 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Installera systemkrav för cryptodome och eventuella beroenden
+RUN apt-get update && apt-get install -y gcc libffi-dev curl nodejs npm && rm -rf /var/lib/apt/lists/*
+
+# Kopiera requirements och installera Python-paket
+COPY apple_school_manager_with_gui_and_assign/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Kopiera hela projektet
+COPY apple_school_manager_with_gui_and_assign/ .
+
+# Kopiera React frontend
+#COPY apple_school_manager_with_gui_and_assign/react-frontend ./react-frontend
+
+# Installera React-beroenden och bygg (valfritt: för produktion)
+#WORKDIR /app/react-frontend
+#RUN npm install --legacy-peer-deps
+
+# För utveckling: starta React dev-server
+# För produktion: avkommentera nedan för att bygga och servera statiska filer
+# RUN npm run build
+
+WORKDIR /app
+
+# Exponera portar för Flask och React
+#EXPOSE 6000 3000
+EXPOSE 6000
+
+# Starta Flask-appen direkt
+CMD ["python", "app.py"]

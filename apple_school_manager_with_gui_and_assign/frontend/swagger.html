@@ -1,47 +1,63 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Swagger UI - Kund</title>
-    <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist/swagger-ui.css" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/frontend/css/atea-style.css">
+    <meta charset="UTF-8">
+    <title>Swagger UI</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css" />
+    <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.11.0/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="https://unpkg.com/swagger-ui-dist@5.11.0/favicon-16x16.png" sizes="16x16" />
     <style>
-      body { margin: 0; font-family: 'Inter', sans-serif; }
+      html
+      {
+        box-sizing: border-box;
+        overflow: -moz-scrollbars-vertical;
+        overflow-y: scroll;
+      }
+
+      *,
+      *:before,
+      *:after
+      {
+        box-sizing: inherit;
+      }
+
+      body
+      {
+        margin:0;
+        background: #fafafa;
+      }
     </style>
   </head>
+
   <body>
-    <div id="customer-header">
-      <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" class="header-logo"/>
-      <span id="customer-name"></span>
-    </div>
     <div id="swagger-ui"></div>
-    <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
+
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js" charset="UTF-8"> </script>
+    <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
     <script>
-      // Hämta customer_id från query-param eller path
-      const urlParams = new URLSearchParams(window.location.search);
-      let customerId = urlParams.get('customer_id');
-      if (!customerId) {
-        const match = window.location.pathname.match(/swagger\/([^\/]+)/);
-        if (match) customerId = match[1];
-      }
-      document.getElementById('customer-name').textContent = customerId
-        ? "Swagger för kund: " + customerId
-        : "Ingen kund vald";
-
-      // Ladda unik swagger-spec för kunden (customer_id är hårdkodad i paths)
-      const specUrl = `/swagger-spec/${customerId}.json`;
-
-      window.addEventListener('DOMContentLoaded', function() {
-        SwaggerUIBundle({
-          url: specUrl,
-          dom_id: '#swagger-ui',
-          presets: [SwaggerUIBundle.presets.apis],
-          layout: "BaseLayout"
-        });
+    window.onload = function() {
+      // Build the Swagger UI
+      const ui = SwaggerUIBundle({
+        url: "/api/swagger.json", // Use the root swagger spec
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout"
       });
+
+      window.ui = ui;
+    };
     </script>
+  </body>
+</html>
+    };
+  </script>
   </body>
 </html>
 

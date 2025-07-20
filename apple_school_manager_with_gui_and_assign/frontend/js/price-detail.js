@@ -1,146 +1,157 @@
-const { useState, useEffect } = React;
+const { useState, useEffect, useMemo } = React;
 
 function PriceDetailPage() {
-    const [productData, setProductData] = useState(null);
+    const [priceListData, setPriceListData] = useState([]);
+    const [allDiscountPrograms, setAllDiscountPrograms] = useState({});
+    const [functionalDiscounts, setFunctionalDiscounts] = useState([]);
+    const [selectedDiscount, setSelectedDiscount] = useState('none');
+    const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
-    
-    // New state for discounts
-    const [discounts, setDiscounts] = useState([]);
-    const [selectedDiscount, setSelectedDiscount] = useState('');
-    const [discountMap, setDiscountMap] = useState(new Map());
-    const [loadingDiscounts, setLoadingDiscounts] = useState(false);
+    const [showDebug, setShowDebug] = useState(false);
 
     useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        const dataParam = params.get('data');
-        if (dataParam) {
+        const loadInitialData = async () => {
             try {
-                const decodedData = JSON.parse(decodeURIComponent(dataParam));
-                setProductData(decodedData);
+                setLoading(true);
+                const [priceData, discounts, funcDiscounts] = await Promise.all([
+                    fetchLatestPriceList(),
+                    fetchAllDiscountPrograms(),
+                    fetchFunctionalDiscounts()
+                ]);
+                setPriceListData(priceData);
+                setAllDiscountPrograms(discounts);
+                setFunctionalDiscounts(funcDiscounts);
             } catch (e) {
-                setError('Failed to parse product data from URL.');
-            }
-        } else {
-            setError('No product data provided in URL.');
-        }
-
-        // Fetch available discount programs
-        const fetchDiscounts = async () => {
-            try {
-                const res = await fetch('/api/discounts/');
-                if (!res.ok) throw new Error('Could not fetch discounts');
-                const discountList = await res.json();
-                setDiscounts(discountList);
-            } catch (e) {
-                console.error("Failed to fetch discounts", e);
+                setError(e.message);
+            } finally {
+                setLoading(false);
             }
         };
-        fetchDiscounts();
+        loadInitialData();
     }, []);
 
-    // Effect to load selected discount data
-    useEffect(() => {
-        if (!selectedDiscount) {
-            setDiscountMap(new Map());
-            return;
+    const calculatedPrices = useMemo(() => {
+        if (loading || priceListData.length === 0) {
+            return [];
         }
-        const loadDiscountData = async () => {
-            setLoadingDiscounts(true);
-            try {
-                const res = await fetch(`/api/discounts/${selectedDiscount}`);
-                if (!res.ok) throw new Error(`Failed to load discount data for ${selectedDiscount}`);
-                const discountData = await res.json();
-                const newDiscountMap = new Map(discountData.map(item => [item['Product Class'], item['Rebate Rate']]));
-                setDiscountMap(newDiscountMap);
-            } catch (e) {
-                console.error(e);
-                setError(`Error loading discount: ${e.message}`);
-                setDiscountMap(new Map());
-            } finally {
-                setLoadingDiscounts(false);
-            }
-        };
-        loadDiscountData();
-    }, [selectedDiscount]);
+        return priceListData.map(product => {
+            const { finalPrice, appliedDiscountRate, discountSource, listPrice } = calculatePrice(
+                product,
+                allDiscountPrograms,
+                selectedDiscount,
+                functionalDiscounts
+            );
+            return {
+                ...product,
+                'List Price': listPrice,
+                'Discount': `${(appliedDiscountRate * 100).toFixed(2)}%`,
+                'Discount Source': discountSource,
+                'Final Price': finalPrice,
+            };
+        });
+    }, [priceListData, selectedDiscount, allDiscountPrograms, functionalDiscounts, loading]);
+
+    const handleDiscountChange = (e) => {
+        setSelectedDiscount(e.target.value);
+    };
+
+    const handleRowClick = (product) => {
+        // Store product data in session storage to pass it to the detail page
+        sessionStorage.setItem('selectedProduct', JSON.stringify(product));
+        window.location.href = '/product-spec';
+    };
+
+    if (loading) {
+        return React.createElement("div", { className: "container" }, 
+            React.createElement("div", { className: "loading" }, 
+                React.createElement("div", { className: "spinner" }), 
+                React.createElement("p", null, "Laddar pris- och rabattdata...")
+            )
+        );
+    }
 
     if (error) {
-        return <div className="container"><h1>Error</h1><p>{error}</p></div>;
+        return React.createElement("div", { className: "container" }, 
+            React.createElement("div", { className: "alert alert-danger" }, error)
+        );
     }
 
-    if (!productData) {
-        return <div className="container"><h1>Loading...</h1></div>;
-    }
-
-    const {
-        'Part Number': partNumber,
-        Description,
-        'ALP Ex VAT': alpExVat,
-        Category,
-    } = productData;
-
-    const rebateRate = discountMap.get(Category) || 0;
-    const discountedPrice = parseFloat(alpExVat) * (1 - rebateRate);
+    const headers = calculatedPrices.length > 0 ? Object.keys(calculatedPrices[0]) : [];
 
     return (
-        <div className="container">
-            <header className="atea-header">
-                <div className="header-content">
-                    <a href="/frontend/"><img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
-                    <div>
-                        <h1>{Description || 'Product Details'}</h1>
-                        <p>Part Number: {partNumber}</p>
-                    </div>
-                </div>
-                <div className="header-links">
-                    <a href="/price-upload" className="header-link">⬅️ Tillbaka till prislistan</a>
-                </div>
-            </header>
+        React.createElement("div", { className: "container" },
+            React.createElement("header", { className: "atea-header" },
+                React.createElement("div", { className: "header-content" },
+                    React.createElement("a", { href: "/" }, 
+                        React.createElement("img", { src: "/images/logo.jpg", alt: "Atea Logo", className: "header-logo", style: { height: '50px' } })
+                    ),
+                    React.createElement("div", null,
+                        React.createElement("h1", null, "Prislista med Rabatter"),
+                        React.createElement("p", null, "Visar den senaste prislistan med valda rabatter applicerade.")
+                    )
+                ),
+                React.createElement("div", { className: "header-links" },
+                    React.createElement("a", { href: "/", className: "header-link" }, "⬅️ Tillbaka till Admin")
+                )
+            ),
 
-            <main style={{ marginTop: '2rem' }}>
-                <window.ProductDetailView productData={productData} />
+            React.createElement("div", { className: "card", style: { padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' } },
+                React.createElement("div", { className: "form-group" },
+                    React.createElement("label", { htmlFor: "discount-select" }, "Välj Rabattprogram"),
+                    React.createElement("select", { id: "discount-select", value: selectedDiscount, onChange: handleDiscountChange },
+                        React.createElement("option", { value: "none" }, "Ingen rabatt"),
+                        Object.keys(allDiscountPrograms).map(name => (
+                            React.createElement("option", { key: name, value: name }, name)
+                        ))
+                    )
+                ),
+                React.createElement("button", { 
+                    onClick: () => setShowDebug(!showDebug), 
+                    className: "btn", 
+                    style: { marginTop: '1rem' } 
+                }, showDebug ? "Dölj Debug" : "Visa Debug")
+            ),
 
-                <div className="card" style={{ padding: '2rem', marginTop: '2rem' }}>
-                     <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem'}}>
-                        <h3 style={{ margin: 0 }}>Pris & Rabatt</h3>
-                        <div className="form-group" style={{margin: 0}}>
-                            <label htmlFor="discount-select" style={{marginRight: '1rem'}}>Rabattprogram:</label>
-                            <select id="discount-select" value={selectedDiscount} onChange={e => setSelectedDiscount(e.target.value)} disabled={discounts.length === 0}>
-                                <option value="">Ingen rabatt</option>
-                                {discounts.map(d => <option key={d} value={d}>{d}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    {loadingDiscounts ? (
-                         <div className="loading"><div className="spinner-small"></div><p>Laddar rabatt...</p></div>
-                    ) : (
-                        <div className="detail-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
-                            <div className="detail-item price-box">
-                                <span className="detail-label">Listpris (ALP Ex VAT)</span>
-                                <span className="detail-value">{parseFloat(alpExVat).toFixed(2)} SEK</span>
-                            </div>
-                            <div className="detail-item price-box">
-                                <span className="detail-label">Rabatt ({selectedDiscount || 'N/A'})</span>
-                                <span className="detail-value" style={{color: 'var(--atea-red)'}}>-{(rebateRate * 100).toFixed(2)}%</span>
-                            </div>
-                            <div className="detail-item price-box final-price">
-                                <span className="detail-label">Pris efter rabatt</span>
-                                <span className="detail-value">{discountedPrice.toFixed(2)} SEK</span>
-                            </div>
-                        </div>
-                    )}
-                </div>
+            showDebug && React.createElement("div", { className: "card", style: { padding: '1rem', marginTop: '1rem' } },
+                React.createElement("h3", null, "Debug: Beräknad Data"),
+                React.createElement("pre", { style: { background: '#f4f4f4', padding: '1rem', borderRadius: '4px', maxHeight: '400px', overflow: 'auto' } },
+                    JSON.stringify(calculatedPrices, null, 2)
+                )
+            ),
 
-                {/* --- New Price Calculator --- */}
-                <div className="card" style={{ padding: '2rem', marginTop: '2rem' }}>
-                    <h3 style={{ margin: 0, marginBottom: '1.5rem' }}>Priskalkylator för affärsmodeller</h3>
-                    <window.PriceCalculator listPrice={alpExVat} discountRate={rebateRate} />
-                </div>
-            </main>
-        </div>
+            React.createElement("div", { className: "card", style: { padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' } },
+                React.createElement("h3", null, "Prislista"),
+                React.createElement("div", { className: "table-container", style: { maxHeight: '70vh', overflow: 'auto' } },
+                    React.createElement("table", { className: "table" },
+                        React.createElement("thead", null,
+                            React.createElement("tr", null,
+                                headers.map(h => React.createElement("th", { key: h }, h))
+                            )
+                        ),
+                        React.createElement("tbody", null,
+                            calculatedPrices.map((row, index) => (
+                                React.createElement("tr", { 
+                                    key: index, 
+                                    onClick: () => handleRowClick(row),
+                                    style: { cursor: 'pointer' } 
+                                },
+                                    headers.map(header => {
+                                        let value = row[header];
+                                        if (typeof value === 'number' && (header.toLowerCase().includes('price'))) {
+                                            value = value.toFixed(2);
+                                        }
+                                        return React.createElement("td", { key: header }, value === null || value === undefined ? '' : String(value));
+                                    })
+                                )
+                            ))
+                        )
+                    )
+                )
+            )
+        )
     );
 }
 
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(<PriceDetailPage />);
-         
+const domContainer = document.getElementById('root');
+const root = ReactDOM.createRoot(domContainer);
+root.render(React.createElement(PriceDetailPage));

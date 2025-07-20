@@ -60,7 +60,7 @@ def parse_discount_excel(file_stream):
         
         # Forward-fill the 'product class' column to handle merged cells or empty values
         # This assumes that a product class applies to all rows below it until a new one is specified.
-        df['product class'].ffill(inplace=True)
+        df['product class'] = df['product class'].ffill()
 
         # Drop rows where essential columns are empty AFTER forward-filling
         initial_rows = len(df)
@@ -87,8 +87,29 @@ def parse_discount_excel(file_stream):
 
         df.columns = [to_title_case(col) for col in df.columns]
         
+        # Replace numpy.nan with Python's None for JSON compatibility.
+        # This is more robust than df.where.
+        df = df.astype(object).where(pd.notnull(df), None)
+        
         # Create the list of dictionaries from the entire processed DataFrame
         data = df.to_dict('records')
+        
+        if not data:
+            logger.error("Data became empty after converting to dictionary. This should not happen if rows exist.")
+            return None, None, "No rows with valid rebate rates found."
+
+        logger.info(f"Successfully parsed {len(data)} discount entries for program '{program_name}'.")
+        return program_name, data, None
+
+    except Exception as e:
+        logger.error(f"Error parsing discount excel file: {e}", exc_info=True)
+        return None, None, str(e)
+        for original, new in output_columns_map.items():
+            if original in df.columns:
+                output_df[new] = df[original]
+
+        # Create the list of dictionaries from the processed DataFrame
+        data = output_df.to_dict('records')
         
         if not data:
             logger.error("Data became empty after converting to dictionary. This should not happen if rows exist.")

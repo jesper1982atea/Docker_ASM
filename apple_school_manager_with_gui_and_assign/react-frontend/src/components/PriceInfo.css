@@ -1,0 +1,31 @@
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-control {
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  margin-top: 0.3rem;
+}
+
+.btn.btn-primary {
+  background-color: #2563eb;
+  border: none;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn.btn-primary:hover {
+  background-color: #1d4ed8;
+}
+
+.alert.alert-danger {
+  background-color: #fee2e2;
+  color: #991b1b;
+  padding: 1rem;
+  border-radius: 6px;
+}

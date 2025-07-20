@@ -20,6 +20,12 @@ function DiscountAdminPage() {
     const [functionalDiscounts, setFunctionalDiscounts] = useState([]);
     const [loadingFunctional, setLoadingFunctional] = useState(true);
 
+    // State for price lists and category discounts
+    const [priceLists, setPriceLists] = useState([]);
+    const [selectedPriceList, setSelectedPriceList] = useState('');
+    const [categories, setCategories] = useState([]);
+    const [categoryDiscounts, setCategoryDiscounts] = useState([]);
+
     const fetchDiscounts = async () => {
         setLoading(true);
         try {
@@ -47,6 +53,32 @@ function DiscountAdminPage() {
             setLoadingFunctional(false);
         }
     };
+
+    // Hämta prislistor vid start
+    useEffect(() => {
+        fetch('/api/price/list')
+            .then(res => res.json())
+            .then(data => {
+                setPriceLists(data);
+                if (data.length > 0) setSelectedPriceList(data[0]);
+            });
+    }, []);
+
+    // Hämta kategorier när prislista väljs
+    useEffect(() => {
+        if (!selectedPriceList) return;
+        fetch(`/api/price/data/${selectedPriceList}`)
+            .then(res => res.json())
+            .then(data => {
+                const cats = [...new Set(data.map(row => row.Category).filter(Boolean))].sort();
+                setCategories(cats);
+                // Initiera rabatter om de inte finns
+                setCategoryDiscounts(cats.map(cat => {
+                    const existing = functionalDiscounts.find(fd => fd.category === cat);
+                    return { category: cat, discount: existing ? existing.discount : 0 };
+                }));
+            });
+    }, [selectedPriceList, functionalDiscounts]);
 
     useEffect(() => {
         fetchDiscounts();
@@ -139,7 +171,7 @@ function DiscountAdminPage() {
         try {
             const response = await fetch('/api/discounts/upload', {
                 method: 'POST',
-                body: formData,
+                body: formData, // Send the file directly
             });
             if (!response.ok) {
                 let errorText = 'Kunde inte ladda upp och spara programmet.';
@@ -161,7 +193,8 @@ function DiscountAdminPage() {
             setProgramName('');
             setRawPreviewData(null);
             fetchDiscounts();
-            alert('Rabattprogrammet har laddats upp!');
+            const result = await response.json();
+            alert(result.message || 'Rabattprogrammet har laddats upp!');
         } catch (err) {
             console.error("FEL vid uppladdning:", err);
             setError(`Ett fel uppstod vid uppladdning: ${err.message}`);
@@ -175,7 +208,7 @@ function DiscountAdminPage() {
             return;
         }
         try {
-            // Encode the program name to handle special characters in the URL
+            // The name from the list is already sanitized, so we just need to encode it for the URL.
             const encodedProgramName = encodeURIComponent(programNameToDelete);
             const response = await fetch(`/api/discounts/${encodedProgramName}`, {
                 method: 'DELETE',
@@ -196,7 +229,8 @@ function DiscountAdminPage() {
         setViewedProgramName(programName);
         setError('');
         try {
-            // Encode the program name to handle special characters in the URL
+            // The name from the list is already sanitized, so we just need to encode it for the URL.
+            // The backend will handle adding the .json extension.
             const encodedProgramName = encodeURIComponent(programName);
             const res = await fetch(`/api/discounts/${encodedProgramName}`);
             if (!res.ok) {
@@ -251,18 +285,44 @@ function DiscountAdminPage() {
         }
     };
 
+    // Hantera ändring av rabatt för kategori
+    const handleCategoryDiscountChange = (index, value) => {
+        const updated = [...categoryDiscounts];
+        updated[index].discount = (parseFloat(value) || 0) / 100;
+        setCategoryDiscounts(updated);
+    };
+
+    // Spara kategori-rabatter som nya funktionella rabatter
+    const handleSaveCategoryDiscounts = async () => {
+        setLoadingFunctional(true);
+        try {
+            const res = await fetch('/api/discounts/functional', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(categoryDiscounts)
+            });
+            if (!res.ok) throw new Error('Failed to save functional discounts');
+            alert('Kategori-rabatter har sparats!');
+            fetchFunctionalDiscounts();
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setLoadingFunctional(false);
+        }
+    };
+
     return (
         <div className="container">
             <header className="atea-header">
                 <div className="header-content">
-                    <a href="/frontend/"><img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
+                    <a href="/"><img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
                     <div>
                         <h1>Hantera Rabattprogram</h1>
                         <p>Ladda upp och administrera rabattavtal.</p>
                     </div>
                 </div>
                 <div className="header-links">
-                    <a href="/frontend/" className="header-link">⬅️ Tillbaka till Admin</a>
+                    <a href="/" className="header-link">⬅️ Tillbaka till Admin</a>
                 </div>
             </header>
 
@@ -279,21 +339,32 @@ function DiscountAdminPage() {
                                     <thead>
                                         <tr>
                                             {Object.keys(viewedProgramData[0]).map(key => <th key={key}>{key}</th>)}
+                                            <th>Total rabatt (%)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {viewedProgramData.map((row, index) => (
-                                            <tr key={index}>
-                                                {Object.keys(row).map(key => {
-                                                    let value = row[key];
-                                                    // Format the rebate rate column specifically as a percentage
-                                                    if (key.toLowerCase().includes('rebate rate') && typeof value === 'number') {
-                                                        value = `${(value * 100).toFixed(2)}%`;
-                                                    }
-                                                    return <td key={key}>{String(value)}</td>;
-                                                })}
-                                            </tr>
-                                        ))}
+                                        {viewedProgramData.map((row, index) => {
+                                            // Hitta funktionell rabatt för denna kategori
+                                            const func = categoryDiscounts.find(fd => fd.category === row['Product Class'] || fd.category === row['Category']);
+                                            const funcDiscount = func ? func.discount : 0;
+                                            const fileDiscount = typeof row['Rebate Rate (%)'] === 'number' ? row['Rebate Rate (%)'] : 0;
+                                            const totalDiscount = ((funcDiscount + fileDiscount) * 100).toFixed(2);
+                                            return (
+                                                <tr key={index}>
+                                                    {Object.keys(row).map(key => {
+                                                        let value = row[key];
+                                                        // Format the rebate rate column specifically as a percentage
+                                                        if (key.toLowerCase().includes('rebate rate') && typeof value === 'number') {
+                                                            value = `${(value * 100).toFixed(2)}%`;
+                                                        } else if (value === null || value === undefined) {
+                                                            value = ''; // Display empty string for null/undefined
+                                                        }
+                                                        return <td key={key}>{String(value)}</td>;
+                                                    })}
+                                                    <td>{totalDiscount}%</td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
@@ -305,44 +376,55 @@ function DiscountAdminPage() {
 
             {/* --- Global Functional Discounts Card --- */}
             <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
-                <h3>Globala Funktionella Rabatter</h3>
-                <p style={{marginTop: '-0.5rem', fontSize: '0.9rem', color: 'var(--text-secondary)'}}>
-                    Dessa rabatter läggs automatiskt på alla produkter i en kategori, för alla rabattprogram.
-                </p>
-                {loadingFunctional ? (
-                    <div className="loading"><div className="spinner-small"></div><p>Laddar...</p></div>
-                ) : (
-                    <div>
-                        {functionalDiscounts.map((item, index) => (
-                            <div key={index} style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '0.5rem' }}>
-                                <select 
-                                    value={item.category} 
-                                    onChange={e => handleFunctionalDiscountChange(index, 'category', e.target.value)}
-                                    style={{flex: 1}}
-                                >
-                                    <option value="Mac">Mac</option>
-                                    <option value="iPad">iPad</option>
-                                    <option value="iPhone">iPhone</option>
-                                    <option value="Watch">Watch</option>
-                                    <option value="Accessories">Tillbehör</option>
-                                </select>
-                                <input 
-                                    type="number" 
-                                    value={(item.discount * 100).toFixed(2)} // Display as percentage
-                                    onChange={e => handleFunctionalDiscountChange(index, 'discount', e.target.value)}
-                                    placeholder="Rabatt %"
-                                    style={{flex: 1}}
-                                />
-                                <span>%</span>
-                                <button onClick={() => handleRemoveFunctionalDiscount(index)} className="btn-delete">&times;</button>
-                            </div>
+                <h3>Funktionella Rabatter per Kategori (från vald prislista)</h3>
+                <div style={{ marginBottom: '1rem' }}>
+                    <label htmlFor="price-list-select">Välj prislista:</label>
+                    <select
+                        id="price-list-select"
+                        value={selectedPriceList}
+                        onChange={e => setSelectedPriceList(e.target.value)}
+                        style={{ marginLeft: '1rem' }}
+                    >
+                        {priceLists.map(list => (
+                            <option key={list} value={list}>{list}</option>
                         ))}
-                        <div style={{marginTop: '1rem', display: 'flex', gap: '1rem'}}>
-                            <button onClick={handleAddFunctionalDiscount} className="btn">+ Lägg till rad</button>
-                            <button onClick={handleSaveFunctionalDiscounts} className="btn btn-primary">Spara globala rabatter</button>
-                        </div>
-                    </div>
+                    </select>
+                </div>
+                {categories.length === 0 ? (
+                    <div>Inga kategorier funna i vald prislista.</div>
+                ) : (
+                    <table className="table" style={{ maxWidth: 500 }}>
+                        <thead>
+                            <tr>
+                                <th>Kategori</th>
+                                <th>Funktionell rabatt (%)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {categoryDiscounts.map((item, idx) => (
+                                <tr key={item.category}>
+                                    <td>{item.category}</td>
+                                    <td>
+                                        <input
+                                            type="number"
+                                            value={(item.discount * 100).toFixed(2)}
+                                            onChange={e => handleCategoryDiscountChange(idx, e.target.value)}
+                                            style={{ width: 80 }}
+                                        />
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 )}
+                <button
+                    onClick={handleSaveCategoryDiscounts}
+                    className="btn btn-primary"
+                    style={{ marginTop: '1rem' }}
+                    disabled={loadingFunctional}
+                >
+                    Spara kategori-rabatter
+                </button>
             </div>
 
             {/* --- Upload New Program Card --- */}
@@ -360,13 +442,13 @@ function DiscountAdminPage() {
                     <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
                         <h4>Förhandsgranskning och Spara</h4>
                         <div className="form-group">
-                            <label htmlFor="program-name">Namn på rabattprogram</label>
+                            <label htmlFor="program-name">Namn på rabattprogram (från fil)</label>
                             <input 
                                 type="text" 
                                 id="program-name" 
                                 value={programName} 
-                                onChange={e => setProgramName(e.target.value)} 
-                                placeholder="Ange ett namn för programmet"
+                                readOnly
+                                placeholder="Programnamn läses från filen"
                             />
                         </div>
                         <div className="table-container" style={{ marginTop: '1.5rem', maxHeight: '400px', overflowY: 'auto' }}>
@@ -394,8 +476,8 @@ function DiscountAdminPage() {
                                 </tbody>
                             </table>
                         </div>
-                        <button onClick={handleUpload} disabled={uploading || !programName} className="btn btn-success" style={{ marginTop: '1rem' }}>
-                            {uploading ? 'Sparar...' : 'Spara program'}
+                        <button onClick={handleUpload} disabled={uploading || !file} className="btn btn-success" style={{ marginTop: '1rem' }}>
+                            {uploading ? 'Sparar...' : 'Ladda upp och spara program'}
                         </button>
                     </div>
                 )}

@@ -1,0 +1,2 @@
+# Ignore GSX API key file (do not commit sensitive keys)
+gsx_api_key.json

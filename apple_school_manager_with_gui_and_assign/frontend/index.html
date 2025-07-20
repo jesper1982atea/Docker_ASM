@@ -1,85 +1,128 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <title>ASM Admin</title>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atea Device Portal</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/frontend/css/atea-style.css">
-  </head>
-  <body>
-    <header class="atea-header">
-      <div class="header-content">
-        <div style="display: flex; align-items: center; gap: 1.5rem;">
-            <img src="/frontend/images/logo.jpg" alt="Atea Logo" class="header-logo" style="height: 50px;"/>
-            <div>
-                <h1>Adminpanel</h1>
-                <p>Hantera Apple School Manager-integrationer</p>
-            </div>
-        </div>
-        <div style="display: flex; align-items: center; gap: 1rem;">
-            <a href="/sales-upload" class="btn" style="background: var(--atea-light-grey); color: var(--atea-black); border: 1px solid var(--border-color);">Sales Data</a>
-            <a href="/price-upload" class="btn" style="background: var(--atea-light-grey); color: var(--atea-black); border: 1px solid var(--border-color);">Price List</a>
-            <a href="/discount-admin" class="btn" style="background: var(--atea-light-grey); color: var(--atea-black); border: 1px solid var(--border-color);">Discounts</a>
-            <button id="add-customer-btn" class="btn btn-primary" style="background: var(--atea-white); color: var(--atea-green);">
-                + Lägg till kund
-            </button>
-        </div>
-      </div>
-    </header>
-    <main class="container" style="max-width: 900px;">
-        <h3 style="font-size: 1.5rem; margin-bottom: 1.5rem; color: var(--atea-black); border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">Customer Overview</h3>
+</head>
+<body>
         <div id="root"></div>
-    </main>
-
-    <!-- Add Customer Modal -->
-    <div id="add-customer-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Lägg till ny kund</h2>
-                <button id="close-modal-btn" class="close-btn">&times;</button>
-            </div>
-            <form id="add-customer-form">
-                <div class="form-group">
-                    <label for="customer-name">Kundnamn</label>
-                    <input type="text" id="customer-name" name="name" required>
+        <!-- <script type="text/babel" src="/frontend/js/price-upload.js"></script> -->
+        <!-- <script type="text/babel" src="/frontend/js/apps/SalesAnalysisApp.js"></script> -->
+        <!-- <script type="text/babel" src="/frontend/js/apps/GsxApp.js"></script> -->
+        <!-- <script type="text/babel" src="/frontend/js/apps/AsmAbmApp.js"></script> -->
+        <script type="text/babel">
+            function Navbar({ page, setPage }) {
+                const navLinks = [
+                    { key: 'price', label: 'Prislista & Kalkylator', icon: '💰' },
+                    { key: 'sales', label: 'Atea Sales Analys', icon: '📊' },
+                    { key: 'gsx', label: 'Apple GSX', icon: '🔍' },
+                    { key: 'asm', label: 'Apple ASM/ABM & Kundkonfiguration', icon: '⚙️' }
+                ];
+                return (
+                    <nav className="atea-navbar" style={{background: 'var(--atea-white)', borderBottom: '2px solid var(--atea-green)'}}>
+                        {navLinks.map(link => (
+                            <button
+                                key={link.key}
+                                className={page === link.key ? 'active atea-nav-btn' : 'atea-nav-btn'}
+                                onClick={() => setPage(link.key)}
+                                style={{
+                                    background: page === link.key ? 'var(--atea-green)' : 'transparent',
+                                    color: page === link.key ? 'var(--atea-white)' : 'var(--atea-green)',
+                                    border: 'none',
+                                    fontWeight: page === link.key ? 700 : 600,
+                                    fontSize: '1.1rem',
+                                    borderRadius: '8px',
+                                    padding: '0.6rem 1.5rem',
+                                    marginRight: '0.5rem',
+                                    transition: 'background 0.2s, color 0.2s',
+                                    boxShadow: page === link.key ? '0 2px 8px #0001' : 'none',
+                                    outline: page === link.key ? '2px solid var(--atea-green-light)' : 'none',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.7em',
+                                }}
+                            >
+                                <span style={{fontSize: '1.3em'}}>{link.icon}</span> {link.label}
+                            </button>
+                        ))}
+                        {/* GSX API-inställningar länk */}
+                        <a
+                            href="/gsx-settings.html"
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                textDecoration: 'none',
+                                color: 'var(--atea-green)',
+                                fontWeight: 600,
+                                fontSize: '1.1rem',
+                                marginLeft: '1.5rem',
+                                padding: '0.6rem 1.5rem',
+                                borderRadius: '8px',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                transition: 'background 0.2s, color 0.2s',
+                            }}
+                        >
+                            <span style={{fontSize: '1.3em', marginRight: '0.7em'}}>🔑</span>GSX API-inställningar
+                        </a>
+                    </nav>
+                );
+            }
+            function App() {
+                const [page, setPage] = React.useState('price');
+                const [iframeUrl, setIframeUrl] = React.useState('/price-upload');
+                React.useEffect(() => {
+                    if (page === 'price') setIframeUrl('/priceUtil');
+                    else if (page === 'sales') setIframeUrl('/sales-upload');
+                    else if (page === 'gsx') setIframeUrl('/gsx-search');
+                    else if (page === 'asm') setIframeUrl('/asm-abm');
+                }, [page]);
+                return (
+                    <div className="atea-app-shell">
+                        <header className="header atea-header">
+                <div className="header-content">
+                    <img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" />
+                    <div>
+                        <h1>Atea Device Portal</h1>
+                        <p style={{margin:0, color:'var(--atea-white)', fontWeight:400}}>Prislista, Sales, Apple GSX & ASM/ABM</p>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="client-id">Client ID</label>
-                    <input type="text" id="client-id" name="client_id" required>
-                </div>
-                <div class="form-group">
-                    <label for="team-id">Team ID</label>
-                    <input type="text" id="team-id" name="team_id" required>
-                </div>
-                <div class="form-group">
-                    <label for="key-id">Key ID</label>
-                    <input type="text" id="key-id" name="key_id" required>
-                </div>
-                <div class="form-group">
-                    <label for="manager-type">Kontotyp</label>
-                    <select id="manager-type" name="manager_type">
-                        <option value="school" selected>Apple School Manager</option>
-                        <option value="business">Apple Business Manager</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="gsx-api-key">GSX API Key (valfritt)</label>
-                    <input type="text" id="gsx-api-key" name="gsx_api_key">
-                </div>
-                <div class="form-group">
-                    <label for="pem-file">Private Key (.pem-fil)</label>
-                    <input type="file" id="pem-file" name="pem" accept=".pem" required>
-                </div>
-                <div class="form-actions">
-                    <button type="submit" class="btn btn-primary">Spara kund</button>
-                    <button type="button" id="cancel-modal-btn" class="btn">Avbryt</button>
-                </div>
-            </form>
+            </header>
+            <Navbar page={page} setPage={setPage} />
+            <main className="atea-main-content" style={{padding: 0}}>
+                <iframe src={iframeUrl} title="App" style={{width: '100%', minHeight: '80vh', border: 'none', borderRadius: '12px'}} />
+            </main>
         </div>
-    </div>
+                );
+            }
+            // CSS för Atea-färger och navbar
+            const style = document.createElement('style');
+            style.innerHTML = `
+                .atea-app-shell { min-height: 100vh; background: #f7f8fa; }
+                .atea-header { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 1.5rem 2rem 1rem 2rem; }
+                .atea-header-content { display: flex; align-items: center; }
+                .atea-navbar { display: flex; gap: 1.5rem; background: #fff; border-bottom: 2px solid #005eb8; padding: 0.75rem 2rem; }
+                .atea-navbar button { background: none; border: none; font-size: 1.1rem; font-weight: 600; color: #2d3a4a; padding: 0.5rem 1.2rem; border-radius: 6px 6px 0 0; cursor: pointer; transition: background 0.2s, color 0.2s; }
+                .atea-navbar button.active, .atea-navbar button:hover { background: #e6f7e0; color: #7ac143; }
+                .atea-navbar button.active { color: #7ac143; font-weight: 700; }
+                .atea-main-content { max-width: 1100px; margin: 2rem auto; background: #fff; border-radius: 12px; box-shadow: 0 2px 8px #0001; min-height: 600px; overflow: hidden; }
+                @media (max-width: 900px) { .atea-main-content { max-width: 100vw; border-radius: 0; } }
+            `;
+            document.head.appendChild(style);
+            ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+        </script>
+        <nav style="margin-bottom:2rem;">
 
-    <script src="admin.js"></script>
-  </body>
+</nav>
+</body>
 </html>

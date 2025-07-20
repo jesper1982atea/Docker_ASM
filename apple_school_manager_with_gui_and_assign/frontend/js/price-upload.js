@@ -1,7 +1,7 @@
 const { useState, useEffect, useMemo } = React;
 
 function Pagination({ currentPage, totalPages, onPageChange }) {
-    if (totalPages <= 1) {
+    if (!totalPages || totalPages <= 1) {
         return null;
     }
 
@@ -13,21 +13,19 @@ function Pagination({ currentPage, totalPages, onPageChange }) {
 
     const pageNumbers = [];
     const maxPagesToShow = 5;
-    let startPage, endPage;
+    let startPage = 1, endPage = totalPages;
 
-    if (totalPages <= maxPagesToShow) {
-        startPage = 1;
-        endPage = totalPages;
-    } else {
-        if (currentPage <= Math.ceil(maxPagesToShow / 2)) {
+    if (totalPages > maxPagesToShow) {
+        const half = Math.floor(maxPagesToShow / 2);
+        if (currentPage <= half) {
             startPage = 1;
             endPage = maxPagesToShow;
-        } else if (currentPage + Math.floor(maxPagesToShow / 2) >= totalPages) {
+        } else if (currentPage + half >= totalPages) {
             startPage = totalPages - maxPagesToShow + 1;
             endPage = totalPages;
         } else {
-            startPage = currentPage - Math.floor(maxPagesToShow / 2);
-            endPage = currentPage + Math.floor(maxPagesToShow / 2);
+            startPage = currentPage - half;
+            endPage = currentPage + half;
         }
     }
 
@@ -180,8 +178,8 @@ function PriceUploader() {
     const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
     const handleRowClick = (rowData) => {
-        const dataString = encodeURIComponent(JSON.stringify(rowData));
-        window.open(`/price-detail?data=${dataString}`, '_blank');
+        sessionStorage.setItem('selectedProduct', JSON.stringify(rowData));
+        window.location.href = '/product-detail';
     };
 
     const handleTagClick = (tag) => {
@@ -193,14 +191,14 @@ function PriceUploader() {
         <div className="container">
             <header className="atea-header">
                 <div className="header-content">
-                    <a href="/frontend/"><img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
+                    <a href="/"><img src="/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
                     <div>
                         <h1>Apple Price List</h1>
                         <p>Ladda upp och visa prisdata från Apple.</p>
                     </div>
                 </div>
                  <div className="header-links">
-                    <a href="/frontend/" className="header-link">⬅️ Tillbaka till Admin</a>
+                    <a href="/" className="header-link">⬅️ Tillbaka till Admin</a>
                 </div>
             </header>
 
@@ -297,6 +295,134 @@ function PriceUploader() {
     );
 }
 
+function PriceUploadPage() {
+    const [file, setFile] = useState(null);
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState('');
+    const [successMessage, setSuccessMessage] = useState('');
+    const [previewData, setPreviewData] = useState(null);
+
+    const handleFileChange = (event) => {
+        const f = event.target.files[0];
+        if (!f) return;
+        setFile(f);
+        setError('');
+        setSuccessMessage('');
+        setPreviewData(null);
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+                setPreviewData(json.slice(0, 10)); // Show preview of first 10 rows
+            } catch (err) {
+                setError('Kunde inte förhandsgranska filen. Se till att det är en giltig Excel-fil.');
+                console.error("File preview error:", err);
+            }
+        };
+        reader.readAsArrayBuffer(f);
+    };
+
+    const handleUpload = async () => {
+        if (!file) {
+            setError('Välj en fil att ladda upp.');
+            return;
+        }
+
+        setUploading(true);
+        setError('');
+        setSuccessMessage('');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('/api/price/upload', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Ett okänt fel uppstod.');
+            }
+            
+            setSuccessMessage(`Prislistan "${file.name}" har laddats upp och bearbetats! ${result.length} produkter importerades.`);
+            setFile(null);
+            setPreviewData(null);
+            document.getElementById('file-upload').value = null;
+
+        } catch (err) {
+            setError(`Fel vid uppladdning: ${err.message}`);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    return (
+        <div className="container">
+            <header className="atea-header">
+                <div className="header-content">
+                    <a href="/"><img src="/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{ height: '50px' }} /></a>
+                    <div>
+                        <h1>Ladda upp prislista</h1>
+                        <p>Ladda upp en ny prislista i Excel-format.</p>
+                    </div>
+                </div>
+                 <div className="header-links">
+                    <a href="/" className="header-link">⬅️ Tillbaka till Admin</a>
+                </div>
+            </header>
+
+            <div className="card" style={{ padding: '2rem', background: 'var(--atea-white)', marginTop: '2rem' }}>
+                <h3>Välj och ladda upp fil</h3>
+                <div className="upload-section" style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+                    <div className="form-group" style={{flexGrow: 1}}>
+                        <label htmlFor="file-upload" className="btn btn-primary">Välj Excel-fil</label>
+                        <input type="file" id="file-upload" onChange={handleFileChange} accept=".xlsx, .xls" style={{ display: 'none' }} />
+                        {file && <span style={{ marginLeft: '1rem' }}>Vald fil: {file.name}</span>}
+                    </div>
+                    <button onClick={handleUpload} disabled={uploading || !file} className="btn btn-success">
+                        {uploading ? 'Laddar upp...' : 'Starta uppladdning'}
+                    </button>
+                </div>
+
+                {error && <div className="alert alert-danger" style={{marginTop: '1rem'}}>{error}</div>}
+                {successMessage && <div className="alert alert-success" style={{marginTop: '1rem'}}>{successMessage}</div>}
+
+                {previewData && (
+                    <div style={{ marginTop: '2rem', borderTop: '1px solid var(--border-color)', paddingTop: '2rem' }}>
+                        <h4>Förhandsgranskning (första 10 raderna)</h4>
+                        <div className="table-container" style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                            <table className="table">
+                                <thead>
+                                    {previewData.length > 0 && (
+                                        <tr>
+                                            {Object.keys(previewData[0]).map(key => <th key={key}>{key}</th>)}
+                                        </tr>
+                                    )}
+                                </thead>
+                                <tbody>
+                                    {previewData.map((row, index) => (
+                                        <tr key={index}>
+                                            {Object.values(row).map((val, i) => <td key={i}>{String(val)}</td>)}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<PriceUploader />);
- 
+

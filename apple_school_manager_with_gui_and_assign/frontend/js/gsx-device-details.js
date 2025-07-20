@@ -8,30 +8,30 @@ function GsxDetailsView({ gsxDetails, serial }) {
 
     return (
         <React.Fragment>
-            <div className="result-card success" style={{borderLeft: 'none', padding: '1.5rem', background: 'var(--atea-light-grey)'}}>
+            <div className="result-card success" style={{borderLeft: 'none', padding: '1.5rem', background: 'var(--atea-light-grey, #f7f7f7)'}}>
                 <div className="result-header">
-                    <span>{serial}</span>
+                    <span><span role="img" aria-label="Serial">🔎</span> {serial}</span>
                     {productImageURL && <img src={productImageURL} alt="Product Image" />}
                 </div>
                 <div className="detail-grid">
                     <div className="detail-item">
-                        <span className="detail-label">Description</span>
+                        <span className="detail-label"><span role="img" aria-label="Description">📝</span> Description</span>
                         <span className="detail-value">{productDescription}</span>
                     </div>
                     <div className="detail-item">
-                        <span className="detail-label">Configuration</span>
+                        <span className="detail-label"><span role="img" aria-label="Config">⚙️</span> Configuration</span>
                         <span className="detail-value">{configDescription}</span>
                     </div>
                     <div className="detail-item">
-                        <span className="detail-label">Sold To</span>
+                        <span className="detail-label"><span role="img" aria-label="Sold To">👤</span> Sold To</span>
                         <span className="detail-value">{soldToName}</span>
                     </div>
                     <div className="detail-item">
-                        <span className="detail-label">Purchase Country</span>
+                        <span className="detail-label"><span role="img" aria-label="Country">🌍</span> Purchase Country</span>
                         <span className="detail-value">{warrantyInfo?.purchaseCountryDesc} ({warrantyInfo?.purchaseCountryCode})</span>
                     </div>
                     <div className="detail-item">
-                        <span className="detail-label">Loaner Device</span>
+                        <span className="detail-label"><span role="img" aria-label="Loaner">🔄</span> Loaner Device</span>
                         <span className="detail-value">{loaner ? 'Yes' : 'No'}</span>
                     </div>
                 </div>
@@ -134,22 +134,38 @@ function GsxDeviceDetailsPage() {
     const pageRef = useRef(null);
 
     useEffect(() => {
-        if (!customerId || !serial) {
-            setError("Customer ID or Serial Number is missing from URL.");
+        if (!serial) {
+            setError("Serial Number is missing from URL.");
             setLoading(false);
             return;
         }
-        
         const fetchDetails = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`/api/${customerId}/gsx/device-details/${serial}`);
+                let res;
+                if (customerId) {
+                    // Om customerId finns, använd endpoint utan nyckel i headern
+                    res = await fetch(`/api/${customerId}/gsx/device-details/${serial}`);
+                } else {
+                    // Hämta GSX-nyckel från backend
+                    const keyRes = await fetch('/api/gsx/gsx-api-key');
+                    const keyData = await keyRes.json();
+                    const apiKey = keyData.api_key;
+                    if (!apiKey) {
+                        setError("Ingen GSX API-nyckel sparad. Gå tillbaka och spara en nyckel först.");
+                        setLoading(false);
+                        return;
+                    }
+                    res = await fetch(`/api/gsx/device-details/${serial}`, {
+                        headers: { 'X-GSX-API-KEY': apiKey }
+                    });
+                }
                 if (!res.ok) throw new Error(`Failed to fetch GSX details: ${res.statusText}`);
                 const data = await res.json();
                 if (data && data.device) {
                     setGsxDetails(data.device);
                 } else {
-                    throw new Error("Device not found in GSX response.");
+                    setError("Device details not found.");
                 }
             } catch (err) {
                 setError(err.message);
@@ -157,7 +173,6 @@ function GsxDeviceDetailsPage() {
                 setLoading(false);
             }
         };
-
         fetchDetails();
     }, [customerId, serial]);
 
@@ -234,31 +249,40 @@ function GsxDeviceDetailsPage() {
 
     return (
         <div className="container" ref={pageRef}>
-            <div className="header atea-header">
-                <div className="header-content">
-                    <div style={{display: 'flex', alignItems: 'center', gap: '1rem'}}>
-                        <img src="/frontend/images/logo.jpg" alt="Atea Logo" className="header-logo" style={{height: '40px'}}/>
-                        <div>
-                            <h1>GSX Device Details</h1>
-                            <p>
-                                {gsxDetails.productDescription} ({serial})
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div className="header-links">
-                    <a href={`/frontend/gsx-search.html?customer=${customerId}`} className="header-link">
-                        ⬅️ Back to GSX Search
-                    </a>
-                    <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
-                        📦 Device List
-                    </a>
-                     <a href="/frontend/" className="header-link">
-                        🏠 Admin Panel
-                    </a>
-                    <button onClick={handleExportExcel} className="header-link">Export to Excel</button>
-                    <button onClick={handleExportPdf} className="header-link">Export to PDF</button>
-                </div>
+            <div style={{margin: '1.5rem 0', display: 'flex', alignItems: 'center', gap: '1rem'}}>
+                <button
+                    className="header-link"
+                    style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', background: 'var(--atea-green, #009639)', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.2rem', cursor: 'pointer'}}
+                    onClick={() => {
+                        if (window.history.length > 1) {
+                            window.history.back();
+                        } else {
+                            const params = new URLSearchParams(window.location.search);
+                            let searchParams = '';
+                            if (params.has('search')) {
+                                searchParams = `&search=${encodeURIComponent(params.get('search'))}`;
+                            }
+                            const customerId = params.get('customer') || '';
+                            window.location.href = `/frontend/gsx-search.html?customer=${customerId}${searchParams}`;
+                        }
+                    }}
+                >
+                    <span role="img" aria-label="Back">🔙</span> Back to GSX Search
+                </button>
+                <button
+                    onClick={handleExportExcel}
+                    className="header-link"
+                    style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', background: 'var(--atea-green, #009639)', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.2rem', cursor: 'pointer'}}
+                >
+                    <span role="img" aria-label="Excel">📊</span> Export to Excel
+                </button>
+                <button
+                    onClick={handleExportPdf}
+                    className="header-link"
+                    style={{display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1rem', background: 'var(--atea-green, #009639)', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.2rem', cursor: 'pointer'}}
+                >
+                    <span role="img" aria-label="PDF">📝</span> Export to PDF
+                </button>
             </div>
             <GsxDetailsView gsxDetails={gsxDetails} serial={serial} />
         </div>

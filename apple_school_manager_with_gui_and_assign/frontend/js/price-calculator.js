@@ -33,7 +33,8 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
 
         const priceDiff = newDeal.salesPrice - originalDeal.sales;
         const marginDiff = newDeal.marginValue - originalDeal.margin;
-        const originalMarginPercent = originalDeal.sales !== 0 ? (originalDeal.margin / originalDeal.sales) * 100 : 0;
+        // Calculate original margin based on Atea's cost price for a more accurate comparison
+        const originalMarginPercent = ateaCostPrice !== 0 ? (originalDeal.margin / ateaCostPrice) * 100 : 0;
 
         return {
             priceDiff,
@@ -43,7 +44,7 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
     }, [originalDeal, newDeal]);
 
     if (listPrice === 0) {
-        return <p>Väntar på prisinformation för att kunna starta kalkylatorn...</p>;
+        return React.createElement('p', null, 'Väntar på prisinformation för att kunna starta kalkylatorn...');
     }
 
     return (
@@ -130,5 +131,123 @@ function PriceCalculator({ listPrice, discountRate = 0, originalDeal = null }) {
     );
 }
 
+/**
+ * Fetches the latest price list data.
+ * @returns {Promise<Array>} A promise that resolves to the price list data.
+ */
+async function fetchLatestPriceList() {
+    const res = await fetch('/api/price/list');
+    if (!res.ok) throw new Error('Could not fetch price lists.');
+    const files = await res.json();
+    if (files.length === 0) throw new Error('No price lists available.');
+    
+    const latestFile = files[0]; // Assuming the list is sorted by date descending
+    const dataRes = await fetch(`/api/price/data/${latestFile}`);
+    if (!dataRes.ok) throw new Error(`Could not fetch data for ${latestFile}.`);
+    return dataRes.json();
+}
+
+/**
+ * Fetches all available discount programs.
+ * @returns {Promise<Object>} A promise that resolves to an object where keys are program names and values are program data.
+ */
+async function fetchAllDiscountPrograms() {
+    const res = await fetch('/api/discounts/');
+    if (!res.ok) throw new Error('Could not fetch discount programs.');
+    const programNames = await res.json();
+    
+    const programs = {};
+    for (const name of programNames) {
+        try {
+            const programRes = await fetch(`/api/discounts/${encodeURIComponent(name)}`);
+            if (programRes.ok) {
+                programs[name] = await programRes.json();
+            }
+        } catch (e) {
+            console.error(`Failed to load discount program ${name}:`, e);
+        }
+    }
+    return programs;
+}
+
+/**
+ * Fetches global functional discounts.
+ * @returns {Promise<Array>} A promise that resolves to an array of functional discount objects.
+ */
+async function fetchFunctionalDiscounts() {
+    const res = await fetch('/api/discounts/functional');
+    if (!res.ok) throw new Error('Could not fetch functional discounts.');
+    return res.json();
+}
+
+/**
+ * Calculates the final price of a product based on selected discounts.
+ * @param {Object} product - The product object from the price list.
+ * @param {Object} allDiscountPrograms - All available discount programs.
+ * @param {string} selectedDiscountProgramName - The name of the chosen discount program.
+ * @param {Array} functionalDiscounts - The array of global functional discounts.
+ * @returns {Object} An object containing the calculated prices and applied discounts.
+ */
+function calculatePrice(product, allDiscountPrograms, selectedDiscountProgramName, functionalDiscounts) {
+    if (!product || typeof product['ALP Ex VAT'] !== 'number') {
+        return { finalPrice: 0, appliedDiscountRate: 0, discountSource: 'N/A', listPrice: 0 };
+    }
+
+    const listPrice = product['ALP Ex VAT'];
+    let finalPrice = listPrice;
+    let appliedDiscountRate = 0;
+    let discountSource = 'Ingen rabatt';
+
+    // 1. Apply functional discount if applicable
+    const productCategory = product['Product Category'];
+    const functionalDiscount = functionalDiscounts.find(d => d.category === productCategory);
+    
+    if (functionalDiscount && typeof functionalDiscount.discount === 'number') {
+        appliedDiscountRate = functionalDiscount.discount;
+        discountSource = `Funktionell (${(appliedDiscountRate * 100).toFixed(2)}%)`;
+    }
+
+    // 2. Apply program-specific discount if a program is selected
+    const selectedProgram = allDiscountPrograms[selectedDiscountProgramName];
+    if (selectedProgram) {
+        const partNumber = product['Part Number'];
+        const productClass = product['Product Class'];
+        let programDiscountEntry = null;
+
+        // Priority 1: Match by partial Part Number ("Product Nr")
+        if (partNumber) {
+            programDiscountEntry = selectedProgram.find(d => {
+                const discountPartNr = d['Product Nr'];
+                return discountPartNr && typeof discountPartNr === 'string' && partNumber.startsWith(discountPartNr);
+            });
+        }
+
+        // Priority 2: Fallback to matching by Product Class
+        if (!programDiscountEntry) {
+            programDiscountEntry = selectedProgram.find(
+                d => d['Product Class'] === productClass
+            );
+        }
+
+        if (programDiscountEntry && typeof programDiscountEntry['Rebate Rate (%)'] === 'number') {
+            // Program discount overrides functional discount
+            appliedDiscountRate = programDiscountEntry['Rebate Rate (%)'];
+            const rateText = (appliedDiscountRate * 100).toFixed(2);
+            const matchType = programDiscountEntry['Product Nr'] ? 'Art.nr' : 'Produktklass';
+            discountSource = `${selectedDiscountProgramName} (${rateText}%, ${matchType})`;
+        }
+    }
+    
+    finalPrice = listPrice * (1 - appliedDiscountRate);
+
+    return {
+        finalPrice,
+        appliedDiscountRate,
+        discountSource,
+        listPrice
+    };
+}
+
 window.PriceCalculator = PriceCalculator;
 
+console.log('[price-calculator] window.PriceCalculator:', typeof window.PriceCalculator);

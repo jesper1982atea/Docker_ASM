@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Produktspecifikation - Atea</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .product-card {
+            background: var(--atea-white);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            padding: 2rem;
+            max-width: 800px;
+            margin: 2rem auto;
+        }
+        .product-header {
+            border-bottom: 1px solid var(--atea-light-grey);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .product-header h2 {
+            margin: 0;
+            color: var(--atea-dark-blue);
+        }
+        .product-header p {
+            margin: 0.25rem 0 0;
+            color: var(--atea-grey);
+            font-size: 0.9rem;
+        }
+        .product-details-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        .detail-item {
+            background-color: #f9f9f9;
+            padding: 1rem;
+            border-radius: 6px;
+        }
+        .detail-item strong {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--atea-dark-blue);
+            font-size: 0.9rem;
+        }
+        .detail-item span {
+            font-size: 1.1rem;
+        }
+        .price-highlight {
+            background-color: var(--atea-green-light);
+            color: var(--atea-dark-blue);
+            font-weight: bold;
+        }
+        .price-highlight span {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="/js/product-spec.js"></script>
+</body>
+</html>

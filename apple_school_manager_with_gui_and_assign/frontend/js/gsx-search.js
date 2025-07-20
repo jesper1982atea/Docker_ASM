@@ -1,6 +1,10 @@
 const { useState, useEffect } = React;
 
 function ResultCard({ serial, data, ok, customerId }) {
+    // Bygg rätt länk beroende på om customerId finns
+    const detailsUrl = customerId
+        ? `/frontend/gsx-device-details.html?customer=${customerId}&serial=${serial}`
+        : `/frontend/gsx-device-details.html?serial=${serial}`;
     if (!ok || !data.device) {
         return (
             <div className="result-card error">
@@ -9,12 +13,10 @@ function ResultCard({ serial, data, ok, customerId }) {
             </div>
         );
     }
-
     const device = data.device;
     const { productDescription, warrantyInfo, soldToName, productImageURL } = device;
-
     return (
-        <a href={`/frontend/gsx-device-details.html?customer=${customerId}&serial=${serial}`} className="result-card-link">
+        <a href={detailsUrl} className="result-card-link">
             <div className="result-card success">
                 <div className="result-header">
                     <span>{serial}</span>
@@ -45,14 +47,60 @@ function ResultCard({ serial, data, ok, customerId }) {
     );
 }
 
+
+function GsxApiKeyManager({ apiKey, setApiKey, setApiKeySaved, reloadApiKey }) {
+    const [saved, setSaved] = useState(false);
+    const [error, setError] = useState('');
+    const handleSave = (e) => {
+        e.preventDefault();
+        setSaved(false);
+        setError('');
+        fetch('/api/gsx/gsx-api-key', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ api_key: apiKey })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                setSaved(true);
+                setApiKeySaved(true);
+                if (reloadApiKey) reloadApiKey();
+            } else {
+                setError(data.error || 'Fel vid sparande');
+            }
+        })
+        .catch(() => setError('Nätverksfel vid sparande'));
+    };
+    return (
+        <form onSubmit={handleSave} style={{marginBottom: '2rem', background: 'var(--atea-light-grey)', padding: '1.5rem', borderRadius: '10px', maxWidth: 500}}>
+            <h3>GSX API-nyckel</h3>
+            <input type="text" value={apiKey} onChange={e=>setApiKey(e.target.value)} placeholder="Klistra in GSX API-nyckel" style={{width: '100%', padding: '0.5rem', fontSize: '1rem', borderRadius: '6px', border: '1px solid #ccc'}} />
+            <button type="submit" style={{marginTop: '1rem', background: 'var(--atea-green)', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.5rem', fontWeight: 600, fontSize: '1rem', cursor: 'pointer'}}>Spara</button>
+            {saved && <span style={{color: 'var(--atea-green)', marginLeft: '1rem'}}>Sparat!</span>}
+            {error && <span style={{color: 'red', marginLeft: '1rem'}}>{error}</span>}
+        </form>
+    );
+}
+
+
 function GsxSearchPage() {
     const [serials, setSerials] = useState('');
     const [results, setResults] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [customerInfo, setCustomerInfo] = useState(null);
+    const [apiKey, setApiKey] = useState('');
+    const [apiKeySaved, setApiKeySaved] = useState(false);
 
     const customerId = new URLSearchParams(window.location.search).get('customer');
+
+    // Helper to reload API key from backend
+    const reloadApiKey = () => {
+        fetch('/api/gsx/gsx-api-key')
+            .then(res => res.json())
+            .then(data => setApiKey(data.api_key || ''));
+    };
 
     useEffect(() => {
         if (customerId) {
@@ -63,31 +111,49 @@ function GsxSearchPage() {
         }
     }, [customerId]);
 
+    useEffect(() => {
+        if (!customerId) {
+            reloadApiKey();
+        }
+    }, [customerId, apiKeySaved]);
+
     const handleSearch = async () => {
         if (!serials.trim()) {
             setResults([]);
             return;
         }
-        const serialList = serials.trim().split(/[\s,]+/).filter(Boolean);
+        if (!customerId && !apiKey) {
+            setError('Ingen GSX API-nyckel angiven.');
+            setLoading(false);
+            return;
+        }
+        const serialList = serials.trim().split(/\s|,|\n/).filter(Boolean);
         setLoading(true);
         setResults([]);
         setError(null);
-
-        const promises = serialList.map(serial => 
-            fetch(`/api/${customerId}/gsx/device-details/${serial}`)
+        let promises;
+        if (customerId) {
+            promises = serialList.map(serial => 
+                fetch(`/api/${customerId}/gsx/device-details/${serial}`)
+                    .then(res => res.json().then(data => ({ serial, data, ok: res.ok })))
+                    .catch(err => ({ serial, data: { error: err.message }, ok: false }))
+            );
+        } else {
+            promises = serialList.map(serial => 
+                fetch(`/api/gsx/device-details/${serial}`, {
+                    headers: { 'X-GSX-API-KEY': apiKey }
+                })
                 .then(res => res.json().then(data => ({ serial, data, ok: res.ok })))
                 .catch(err => ({ serial, data: { error: err.message }, ok: false }))
-        );
-
+            );
+        }
         const settledResults = await Promise.allSettled(promises);
-        
         const finalResults = settledResults.map(res => {
             if (res.status === 'fulfilled') {
                 return res.value;
             }
             return { serial: 'Unknown', data: { error: 'Request failed' }, ok: false };
         });
-
         setResults(finalResults);
         setLoading(false);
     };
@@ -140,33 +206,17 @@ function GsxSearchPage() {
         XLSX.writeFile(workbook, `GSX_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
     };
 
-    if (!customerId) {
-        return <div className="container"><h1>Error</h1><p>No customer ID specified in URL.</p></div>;
+    if (!customerId && !apiKey) {
+        return (
+            <div className="container">
+                <GsxApiKeyManager apiKey={apiKey} setApiKey={setApiKey} setApiKeySaved={setApiKeySaved} reloadApiKey={reloadApiKey} />
+                <p>Fyll i din GSX API-nyckel ovan för att använda sökningen.</p>
+            </div>
+        );
     }
-
     return (
         <div className="container">
-            <div className="header atea-header">
-                <div className="header-content">
-                    <img src="/frontend/assets/atea-logo.svg" alt="Atea Logo" className="header-logo"/>
-                    <div>
-                        <h1>GSX Device Search</h1>
-                        <p>Enter serial numbers to get device details from GSX.</p>
-                    </div>
-                </div>
-                <div className="header-links">
-                    <a href={`/swagger/${customerId}`} target="_blank" className="header-link api-link">
-                        📋 API Docs
-                    </a>
-                    <a href={`/frontend/customer-devices.html?customer=${customerId}`} className="header-link">
-                        ⬅️ Back to Device List
-                    </a>
-                     <a href="/frontend/" className="header-link">
-                        🏠 Admin Panel
-                    </a>
-                </div>
-            </div>
-
+            {!customerId && <GsxApiKeyManager apiKey={apiKey} setApiKey={setApiKey} setApiKeySaved={setApiKeySaved} reloadApiKey={reloadApiKey} />}
             <div className="search-controls">
                 <textarea 
                     value={serials}
@@ -174,7 +224,7 @@ function GsxSearchPage() {
                     placeholder="Enter serial numbers (separated by space, comma, or new line)..."
                 />
                 <div className="search-buttons">
-                    <button className="btn btn-primary" onClick={handleSearch} disabled={loading}>
+                    <button className="btn btn-primary" onClick={handleSearch} disabled={loading || (!customerId && !apiKey)}>
                         {loading ? 'Searching...' : 'Search'}
                     </button>
                     <button className="btn btn-secondary" onClick={handleExport} disabled={results.length === 0}>
@@ -182,11 +232,9 @@ function GsxSearchPage() {
                     </button>
                 </div>
             </div>
-
             {loading && (
                 <div className="loading"><div className="spinner"></div><p>Fetching details...</p></div>
             )}
-
             {results.length > 0 && (
                 <div className="results-grid">
                     {results.map(({ serial, data, ok }) => (

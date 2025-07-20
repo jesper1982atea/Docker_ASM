@@ -1,0 +1,27 @@
+/* Pagination styles for reuse */
+.pagination {
+  display: flex;
+  gap: 0.3em;
+  align-items: center;
+}
+.pagination button {
+  font-size: 0.95rem;
+  padding: 0.2em 0.7em;
+  border-radius: 3px;
+  border: 1px solid var(--border-color, #e0e0e0);
+  background: #fff;
+  cursor: pointer;
+}
+.pagination button.active {
+  background: var(--atea-blue, #0072c6);
+  color: #fff;
+  font-weight: 600;
+}
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.page-ellipsis {
+  padding: 0 0.3em;
+  color: #888;
+}
