@@ -64,3 +64,6 @@ apple_school_manager_with_gui_and_assign/price_uploads/raw/Price_List_Sweden_L59
 
 # Persistent/secret data for Docker volumes
 /data/
+Arkiv.zip
+/customers
+customers
