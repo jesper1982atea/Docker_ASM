@@ -27,7 +27,7 @@ export default function PriceInfo(props) {
       setSelectedPriceList(priceLists[0]);
       // Only fetch if part number is filled
       if (inputPartNumber) {
-        onFetchPriceInfo();
+        onFetchPriceInfo(priceLists[0]);
       }
     }
   }, [priceLists, selectedPriceList, inputPartNumber, setSelectedPriceList, onFetchPriceInfo]);

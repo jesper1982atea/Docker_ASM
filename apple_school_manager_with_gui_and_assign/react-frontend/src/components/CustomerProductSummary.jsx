@@ -506,11 +506,12 @@ function getCustomerInfo(data) {
 
 function summarizeProducts(data) {
   if (!data) return [];
+  console.log("Summarizing products...", data);
   const map = new Map();
   data.forEach(row => {
     const part = row['Artikelnr (tillverkare)'];
     if (!part) return;
-    const name = row['Artikelbenamning (APA)'] || row['ARTIKELBENÄMNING (APA)'] || row['Produktnamn'] || row['Produkt'] || row['Benämning'] || row['Produktnamn (från fil)'] || '';
+    const name = row['Artikelbenämning (APA)'] || row['ARTIKELBENÄMNING (APA)'] || row['Produktnamn'] || row['Produkt'] || row['Benämning'] || row['Produktnamn (från fil)'] || '';
     const totFors = parseFloat((row['Tot Förs (SEK)'] || '').toString().replace(/\s/g, '').replace(',', '.'));
     const totKost = parseFloat((row['Tot Kost (SEK)'] || '').toString().replace(/\s/g, '').replace(',', '.'));
     let margin = null;
@@ -725,10 +726,12 @@ export function CustomerProductSummaryView({ data }) {
           priceData={applePriceData}
           loading={appleLoading}
           error={appleError}
-          onFetchPriceInfo={() => {}}
+          onFetchPriceInfo={() => {applePriceProduct && setApplePriceData(applePriceProduct)}}
         />
+       
         {applePriceData && (
           <div style={{ marginTop: '2rem' }}>
+            {/* {console.log('Apple Price Data:', applePriceProduct)} */}
             <PriceCalculate priceInfo={applePriceData} loading={false} error={''} onCalculatedPrices={setCalculatedPrices} />
             {calculatedPrices && summary.length > 0 && (
               // Only render if at least one Apple price is a valid number
@@ -737,7 +740,7 @@ export function CustomerProductSummaryView({ data }) {
                   <PriceComparisonTable
                     summary={summary}
                     calculated={calculatedPrices}
-                    appleproduct={applePriceList}
+                    appleproduct={applePriceData}
                   />
                 </ErrorBoundary>
               

@@ -88,7 +88,7 @@
 import React, { useState } from 'react';
 import GradingInfoPopup from './GradingInfoPopup';
 
-export default function PriceCalculate({ priceInfo, loading, error, onCalculatedPrices }) {
+export default function PriceCalculate({ priceInfo, loading, error, onCalculatedPrices, applePriceProduct }) {
   const [restvarde, setRestvarde] = useState(25);
   const [kontantMarginal, setKontantMarginal] = useState(5);
   const [leasingMarginal, setLeasingMarginal] = useState(5);
